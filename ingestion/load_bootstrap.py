@@ -14,15 +14,18 @@ resp.raise_for_status()
 data = resp.json()
 
 def flatten_nested(df):
-    # Postgres can't store raw Python lists/dicts, so convert them to JSON text
+    # Convert raw Python dicts to JSON text to store in Postgres
     for col in df.columns:
         if df[col].apply(lambda v: isinstance(v, (list, dict))).any():
             df[col] = df[col].apply(json.dumps)
     return df
 
-for key, table in [("elements", "raw_players"),
-                   ("teams", "raw_teams"),
-                   ("events", "raw_gameweeks")]:
-    df = flatten_nested(pd.DataFrame(data[key]))
-    df.to_sql(table, engine, if_exists="replace", index=False)
-    print(f"Loaded {len(df)} rows into {table}")
+if __name__ == "__main__":
+    for key, table in [("elements", "raw_players"),
+                    ("teams", "raw_teams"),
+                    ("events", "raw_gameweeks")]:
+        df = flatten_nested(pd.DataFrame(data[key]))
+        
+        #if_exists ensures no duplicates 
+        df.to_sql(table, engine, if_exists="replace", index=False)
+        print(f"Loaded {len(df)} rows into {table}")
