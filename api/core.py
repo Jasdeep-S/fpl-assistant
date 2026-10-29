@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Optional
+from typing import List, Optional
 
 import pandas as pd
 import pulp
@@ -12,6 +12,9 @@ load_dotenv()
 engine = create_engine(os.environ["DATABASE_URL"])
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 POSITIONS = ["GK", "DEF", "MID", "FWD"]
+
+PLAYER_COLS = ["player_id", "web_name", "pos", "team_name", "price", "news",
+               "fixture", "fdr", "model_points", "predicted_points"]
 
 
 class TeamNotFound(Exception):
@@ -27,13 +30,65 @@ def load_predictions() -> pd.DataFrame:
     return pd.read_sql("SELECT * FROM predictions", engine)
 
 
-def top_predictions(limit: int = 20, pos: Optional[str] = None):
+def top_predictions(limit: int = 20, pos: Optional[str] = None,
+                    max_price: Optional[float] = None,
+                    min_price: Optional[float] = None):
+    """Prices in millions (e.g. 5.0). Stored prices are in tenths of a million."""
     preds = load_predictions()
     if pos:
         preds = preds[preds["pos"] == pos.upper()]
+    if max_price is not None:
+        preds = preds[preds["price"] <= max_price * 10]
+    if min_price is not None:
+        preds = preds[preds["price"] >= min_price * 10]
     preds = preds.sort_values("predicted_points", ascending=False).head(limit)
-    cols = ["player_id", "web_name", "pos", "team", "price", "news", "predicted_points"]
-    return _records(preds[cols])
+    return _records(preds[PLAYER_COLS])
+
+
+def find_players(names: List[str]):
+    preds = load_predictions()
+    rows = []
+    for name in names:
+        hits = preds[preds["web_name"].str.contains(name, case=False, na=False)]
+        rows.append(hits.sort_values("predicted_points", ascending=False).head(3))
+    if not rows:
+        return []
+    return _records(pd.concat(rows)[PLAYER_COLS])
+
+
+def get_team_fixtures(team: str, num_gameweeks: int = 5):
+    """Upcoming fixtures and FPL difficulty ratings for a club (name or short name)."""
+    teams = pd.read_sql("SELECT id, name, short_name FROM raw_teams", engine)
+    exact = teams[(teams["name"].str.lower() == team.lower())
+                  | (teams["short_name"].str.lower() == team.lower())]
+    match = exact if len(exact) else teams[
+        teams["name"].str.contains(team, case=False, na=False)
+        | teams["short_name"].str.contains(team, case=False, na=False)]
+    if match.empty:
+        raise ValueError(f"No club found matching '{team}'")
+    t = match.iloc[0]
+
+    gws = pd.read_sql("SELECT id, is_next FROM raw_gameweeks", engine)
+    next_gw = int(gws.loc[gws["is_next"], "id"].iloc[0])
+    fx = pd.read_sql(
+        "SELECT event, team_h, team_a, team_h_difficulty, team_a_difficulty "
+        "FROM raw_fixtures", engine)
+    fx = fx[(fx["event"] >= next_gw) & ((fx["team_h"] == t["id"]) | (fx["team_a"] == t["id"]))]
+    fx = fx.sort_values("event").head(num_gameweeks)
+
+    short = dict(zip(teams["id"], teams["short_name"]))
+    out = []
+    for _, r in fx.iterrows():
+        is_home = r["team_h"] == t["id"]
+        opp = r["team_a"] if is_home else r["team_h"]
+        out.append({
+            "gameweek": int(r["event"]),
+            "opponent": short[opp],
+            "venue": "H" if is_home else "A",
+            "difficulty": int(r["team_h_difficulty"] if is_home else r["team_a_difficulty"]),
+        })
+    return {"club": t["name"], "fixtures": out,
+            "note": "Difficulty: 1 = easiest, 5 = hardest (FPL's own rating)"}
 
 
 def fetch_squad(team_id: int, preds: pd.DataFrame):
@@ -86,7 +141,8 @@ def pick_lineup(team_id: int):
     pool = cap_pool if len(cap_pool) >= 2 else xi
     captain, vice = pool.iloc[0], pool.iloc[1]
 
-    cols = ["player_id", "web_name", "pos", "predicted_points"]
+    cols = ["player_id", "web_name", "pos", "team_name", "fixture", "fdr",
+            "predicted_points"]
     return {
         "team_id": team_id,
         "gameweek": next_gw,
@@ -118,9 +174,13 @@ def best_xi_points(df: pd.DataFrame) -> float:
     return best
 
 
-def suggest_transfers(team_id: int, top_n: int = 8):
+def suggest_transfers(team_id: int, top_n: int = 8,
+                      bank_override: Optional[float] = None):
+    """bank_override is in millions (e.g. 2.5) and replaces the real bank balance."""
     preds = load_predictions()
     squad, squad_ids, bank, next_gw = fetch_squad(team_id, preds)
+    if bank_override is not None:
+        bank = int(round(bank_override * 10))   # £2.5m -> 25 (tenths of a million)
     base = best_xi_points(squad)
     team_counts = squad["team"].value_counts().to_dict()
     suggestions = []
@@ -145,14 +205,15 @@ def suggest_transfers(team_id: int, top_n: int = 8):
             suggestions.append({
                 "sell": out["web_name"], "buy": cand["web_name"], "pos": out["pos"],
                 "cost_change": round(float(cand["price"] - out["price"]) / 10, 1),
-                "gain": round(float(gain), 2), "buy_news": cand["news"],
+                "gain": round(float(gain), 2),
+                "buy_fixture": cand["fixture"], "buy_news": cand["news"],
             })
 
     suggestions.sort(key=lambda s: s["gain"], reverse=True)
     return {
         "team_id": team_id,
         "gameweek": next_gw,
-        "bank": bank / 10,
+        "bank_millions": bank / 10,
         "current_xi_points": round(float(base), 2),
         "suggestions": suggestions[:top_n],
     }
