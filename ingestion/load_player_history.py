@@ -25,7 +25,7 @@ for i, pid in enumerate(players, 1):
         print(f"{i}/{len(players)} players done")
 
     # sleep 3 seconds to not break the api 
-    time.sleep(0.3)
+    time.sleep(0.5)
 
 df = pd.DataFrame(rows)
 df.to_sql("raw_player_history", engine, if_exists="replace", index=False)
