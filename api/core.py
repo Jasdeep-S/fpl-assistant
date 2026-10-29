@@ -20,6 +20,16 @@ PLAYER_COLS = ["player_id", "web_name", "pos", "team_name", "price", "news",
 class TeamNotFound(Exception):
     pass
 
+def next_deadline():
+    gws = pd.read_sql("SELECT id, name, deadline_time FROM raw_gameweeks", engine)
+    gws["dl"] = pd.to_datetime(gws["deadline_time"], utc=True)
+    upcoming = gws[gws["dl"] > pd.Timestamp.now(tz="UTC")].sort_values("dl")
+    if upcoming.empty:
+        raise ValueError("No upcoming deadline found (season may be over)")
+    r = upcoming.iloc[0]
+    return {"gameweek": int(r["id"]), "name": r["name"],
+            "deadline": r["dl"].isoformat()}
+
 
 def _records(df: pd.DataFrame):
     # to_json handles numpy types and NaN (becomes null), so the result is JSON-safe

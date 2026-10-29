@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TheDugout - FPL Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<style>
+:root{--deep:#0c3324;--turf:#1f6b43;--chalk:#f4f6ea;--amber:#f0a92e;--bg:#e6ebdc;
+  --surface:#f8f9f2;--ink:#12241b;--muted:#5a6d60;--line:#ccd6c0;--red:#c8402f}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;
+  background:var(--bg);color:var(--ink);line-height:1.45}
+button,input,select,textarea{font:inherit}
+:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+
+header{background:var(--deep);color:var(--chalk);padding:12px 20px;display:flex;flex-wrap:wrap;
+  gap:12px;align-items:center;justify-content:space-between;border-bottom:4px solid var(--amber)}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+h1{margin:0;font-size:1.5rem;font-weight:800;letter-spacing:-.03em}
+.tag{font-size:.9rem;color:#9fc4ad;font-weight:400}
+.loader{display:flex;gap:8px;align-items:center}
+.loader input{width:10em;padding:8px 10px;border-radius:6px;border:0;background:var(--chalk);color:var(--ink)}
+.btn{border:0;border-radius:6px;padding:8px 16px;font-weight:600;cursor:pointer;background:var(--amber);color:var(--deep)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.app{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;max-width:1200px;margin:0 auto;padding:16px}
+@media(max-width:900px){.app{grid-template-columns:1fr}}
+.panel{background:var(--surface);border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.panel-head{background:var(--deep);color:var(--chalk);padding:10px 16px;display:flex;
+  justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.92rem}
+.panel-head b{color:var(--amber)}
+
+.pitch{position:relative;min-height:560px;padding:20px 8px 16px;display:flex;flex-direction:column;
+  justify-content:space-around;background:repeating-linear-gradient(180deg,#2b8450 0 56px,#267a49 56px 112px)}
+.pitch svg.lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.row{position:relative;display:flex;justify-content:space-around;align-items:flex-start;gap:4px}
+.pitch-empty{position:relative;color:var(--chalk);text-align:center;font-weight:600;padding:0 24px}
+.pitch-empty.err{color:#ffd9d2}
+.player{width:86px;text-align:center;flex:none}
+.shirt{position:relative;width:46px;margin:0 auto;display:block}
+.shirt svg{width:46px;height:42px;display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
+.badge{position:absolute;top:-4px;right:-8px;width:20px;height:20px;border-radius:50%;background:var(--amber);
+  color:var(--deep);font-size:.7rem;font-weight:800;display:grid;place-items:center;border:1.5px solid var(--deep)}
+.pname{background:var(--deep);color:var(--chalk);font-size:.74rem;font-weight:600;padding:2px 4px;
+  border-radius:4px 4px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pinfo{background:var(--chalk);font-size:.7rem;border-radius:0 0 4px 4px;padding:2px 3px;display:flex;flex-direction:column;gap:1px}
+.pinfo .pts{font-weight:800;font-size:.8rem}
+.fx{border-radius:3px;padding:0 3px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fdr1,.fdr2{background:#b9e8a0;color:#10361c}.fdr3{background:#e1e5d3;color:#333}
+.fdr4{background:#f5b971;color:#3a1c00}.fdr5{background:#d9523f;color:#fff}
+.bench{background:#cfdcc4;padding:10px 8px;display:flex;justify-content:space-around;gap:4px;border-top:3px solid var(--chalk)}
+.bench .tag{font-size:.65rem;color:#2d5a3e;font-weight:600;margin-bottom:2px}
+
+.tabs{display:flex;border-bottom:1px solid var(--line);background:#eef2e6}
+.tab{flex:1;border:0;background:none;padding:12px 8px;font-weight:600;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent}
+.tab[aria-selected=true]{color:var(--deep);border-bottom-color:var(--amber)}
+.tabpanel{height:600px;display:flex;flex-direction:column}
+.tabpanel[hidden]{display:none}
+.scroll{flex:1;overflow:auto;padding:12px 14px}
+.hint{color:var(--muted);font-size:.88rem;margin:0 0 10px}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th{background:#eaf0e0;text-align:left;font-weight:600}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td.num,th.num{text-align:right}
+.gain{font-weight:800;color:var(--turf)}.neg{color:var(--red)}
+.toolbar{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}
+select{padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:#fff}
+.err{color:var(--red);font-weight:600}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.chip{border:1.5px solid var(--turf);background:#fff;color:var(--deep);border-radius:999px;padding:5px 12px;font-size:.82rem;cursor:pointer}
+.chip:hover{background:var(--turf);color:var(--chalk)}
+.msg{display:flex;margin:0 0 10px}.msg.user{justify-content:flex-end}
+.bubble{max-width:90%;padding:8px 12px;border-radius:12px;overflow-wrap:anywhere;font-size:.92rem}
+.user .bubble{background:var(--deep);color:var(--chalk);border-bottom-right-radius:3px}
+.bot .bubble{background:#e8eede;border-bottom-left-radius:3px}
+.bubble p{margin:.4em 0}.bot .bubble>:first-child{margin-top:0}.bot .bubble>:last-child{margin-bottom:0}
+.bubble table{display:block;overflow-x:auto;margin:.5em 0}
+.msg.error .bubble{background:#fbe5e0;color:#8f2a1c}
+.msg.typing .bubble{color:var(--muted)}
+form.composer{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
+textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px solid var(--line);max-height:7em;background:#fff}
+.note{font-size:.74rem;color:var(--muted);padding:0 14px 10px}
+.countdown{display:flex;flex-direction:column;align-items:center;line-height:1.2}
+.cd-label{font-size:.75rem;color:#9fc4ad}
+.cd-time{font-size:1.15rem;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums}
+.countdown.urgent .cd-time{color:#ff8a70}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><h1>TheDugout</h1><span class="tag">FPL Assistant</span></div>
+  <div class="countdown" id="countdown" hidden><span class="cd-label" id="cdLabel"></span><span class="cd-time" id="cdTime"></span></div>
+  <form class="loader" id="loadForm">
+    <label for="teamId" style="font-size:.9rem">Team ID</label>
+    <input id="teamId" inputmode="numeric" placeholder="e.g. 1829025">
+    <button class="btn" id="loadBtn" type="submit">Load team</button>
+  </form>
+</header>
+
+<div class="app">
+  <section class="panel" aria-label="Your lineup">
+    <div class="panel-head" id="pitchHead"><span>Your best XI</span><span id="pitchSummary"></span></div>
+    <div class="pitch" id="pitch">
+      <svg class="lines" viewBox="0 0 100 100" preserveAspectRatio="none" fill="none" stroke="rgba(255,255,255,.55)" stroke-width=".5" vector-effect="non-scaling-stroke" aria-hidden="true">
+        <rect x="1" y="1" width="98" height="98"/><line x1="1" y1="50" x2="99" y2="50"/>
+        <circle cx="50" cy="50" r="9"/><rect x="25" y="1" width="50" height="15"/>
+        <rect x="25" y="84" width="50" height="15"/><rect x="38" y="1" width="24" height="6"/>
+        <rect x="38" y="93" width="24" height="6"/>
+      </svg>
+      <div class="pitch-empty" id="pitchEmpty">Enter your team ID and tap Load team to see your best XI for the next gameweek.</div>
+    </div>
+    <div class="bench" id="bench" hidden></div>
+  </section>
+
+  <section class="panel" aria-label="Assistant">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="chat">Ask TheDugout</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="transfers">Transfers</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="players">Top players</button>
+    </div>
+
+    <div class="tabpanel" id="tab-chat" role="tabpanel">
+      <div class="scroll" id="log" aria-live="polite">
+        <div class="chips" id="chips"></div>
+        <div id="thread"></div>
+      </div>
+      <form class="composer" id="form">
+        <textarea id="input" rows="1" maxlength="500" aria-label="Your question" placeholder="Who should I captain this week?"></textarea>
+        <button class="btn" id="send" type="submit">Send</button>
+      </form>
+      <div class="note">Predictions are model estimates, not guarantees. Fixture difficulty is a simple adjustment.</div>
+    </div>
+
+    <div class="tabpanel" id="tab-transfers" role="tabpanel" hidden>
+      <div class="scroll" id="transfers"><p class="hint">Load your team to see the best single transfers.</p></div>
+    </div>
+
+    <div class="tabpanel" id="tab-players" role="tabpanel" hidden>
+      <div class="toolbar"><label for="posFilter">Position</label>
+        <select id="posFilter"><option value="">All</option><option>GK</option><option>DEF</option><option>MID</option><option>FWD</option></select>
+      </div>
+      <div class="scroll" id="players"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+async function api(path) {
+  const r = await fetch(path);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "Request failed");
+  return d;
+}
+const money = tenths => "£" + (tenths / 10).toFixed(1) + "m";
+const teamInput = $("teamId");
+try { teamInput.value = localStorage.getItem("teamId") || ""; } catch (e) {}
+const getTeamId = () => /^\d+$/.test(teamInput.value.trim()) ? parseInt(teamInput.value.trim(), 10) : null;
+
+/* ---------- tabs ---------- */
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === t));
+  document.querySelectorAll(".tabpanel").forEach(p => p.hidden = p.id !== "tab-" + t.dataset.tab);
+  if (t.dataset.tab === "players" && !$("players").hasChildNodes()) loadPlayers();
+}));
+
+/* ---------- pitch ---------- */
+const POS_COLOR = { GK: "#f0a92e", DEF: "#2f6fb5", MID: "#f4f6ea", FWD: "#c8402f" };
+function shirt(pos) {
+  const s = el("span", "shirt");
+  s.innerHTML = '<svg viewBox="0 0 40 36" aria-hidden="true"><path d="M12 2 2 8l4 8 4-2v20h20V14l4 2 4-8-10-6q-8 6-16 0Z" fill="' +
+    (POS_COLOR[pos] || "#fff") + '" stroke="#0c3324" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+  return s;
+}
+function playerCard(p, badge) {
+  const c = el("div", "player");
+  const sh = shirt(p.pos);
+  if (badge) sh.appendChild(el("span", "badge", badge));
+  const info = el("div", "pinfo");
+  const fdr = Math.min(5, Math.max(1, Math.round(p.fdr || 3)));
+  info.appendChild(el("span", "fx fdr" + fdr, p.fixture || "-"));
+  info.appendChild(el("span", "pts", Number(p.predicted_points).toFixed(1)));
+  c.append(sh, el("div", "pname", p.web_name), info);
+  c.title = p.web_name + " (" + (p.team_name || "") + ")";
+  return c;
+}
+function renderLineup(d) {
+  const pitch = $("pitch");
+  pitch.querySelectorAll(".row,.pitch-empty").forEach(n => n.remove());
+  ["FWD", "MID", "DEF", "GK"].forEach(pos => {
+    const r = el("div", "row");
+    d.starting_xi.filter(p => p.pos === pos).forEach(p =>
+      r.appendChild(playerCard(p, p.web_name === d.captain ? "C" : p.web_name === d.vice_captain ? "V" : "")));
+    pitch.appendChild(r);
+  });
+  const bench = $("bench");
+  bench.replaceChildren();
+  d.bench.forEach((p, i) => {
+    const w = el("div");
+    w.appendChild(el("div", "tag", i === 0 && p.pos === "GK" ? "GKP" : String(i)));
+    w.appendChild(playerCard(p, ""));
+    bench.appendChild(w);
+  });
+  bench.hidden = false;
+  $("pitchSummary").replaceChildren(
+    document.createTextNode("GW" + d.gameweek + " expected: "), el("b", "", d.expected_points + " pts"),
+    document.createTextNode(" | Captain: " + d.captain));
+}
+
+/* ---------- transfers ---------- */
+function renderTransfers(d) {
+  const box = $("transfers");
+  box.replaceChildren(el("p", "hint",
+    "Bank " + "£" + Number(d.bank_millions).toFixed(1) + "m. Current XI: " + d.current_xi_points +
+    " expected points. A transfer beyond your free one costs 4 points, so only take a hit for a gain above 4."));
+  const t = el("table"), head = el("tr");
+  ["Sell", "Buy", "Cost", "Gain", "Fixture"].forEach((h, i) => head.appendChild(el("th", i === 2 || i === 3 ? "num" : "", h)));
+  t.appendChild(head);
+  d.suggestions.forEach(s => {
+    const r = el("tr");
+    r.append(el("td", "", s.sell), el("td", "", s.buy + (s.buy_news ? " (!)" : "")),
+      el("td", "num " + (s.cost_change > 0 ? "neg" : ""), (s.cost_change > 0 ? "+" : "") + s.cost_change.toFixed(1)),
+      el("td", "num gain", "+" + s.gain.toFixed(2)), el("td", "", s.buy_fixture || "-"));
+    t.appendChild(r);
+  });
+  box.appendChild(t);
+  if (d.suggestions.some(s => s.buy_news)) box.appendChild(el("p", "hint", "(!) means the player has injury news."));
+}
+
+/* ---------- load team ---------- */
+$("loadForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const id = getTeamId();
+  if (!id) { $("pitchEmpty")?.replaceChildren("Team ID must be a number, e.g. 1829025."); return; }
+  try { localStorage.setItem("teamId", String(id)); } catch (e) {}
+  $("loadBtn").disabled = true; $("loadBtn").textContent = "Loading...";
+  $("transfers").replaceChildren(el("p", "hint", "Loading transfers..."));
+  const [lineup, transfers] = await Promise.allSettled([api("/lineup/" + id), api("/transfers/" + id)]);
+  if (lineup.status === "fulfilled") renderLineup(lineup.value);
+  else { const m = $("pitchEmpty") || el("div", "pitch-empty", ""); m.className = "pitch-empty err";
+    m.textContent = lineup.reason.message; if (!m.isConnected) $("pitch").appendChild(m); }
+  if (transfers.status === "fulfilled") renderTransfers(transfers.value);
+  else $("transfers").replaceChildren(el("p", "err", transfers.reason.message));
+  $("loadBtn").disabled = false; $("loadBtn").textContent = "Load team";
+});
+
+/* ---------- top players ---------- */
+async function loadPlayers() {
+  const box = $("players");
+  box.replaceChildren(el("p", "hint", "Loading..."));
+  try {
+    const pos = $("posFilter").value;
+    const rows = await api("/predictions?limit=25" + (pos ? "&pos=" + pos : ""));
+    const t = el("table"), head = el("tr");
+    ["Player", "Pos", "Price", "Fixture", "Pts"].forEach((h, i) => head.appendChild(el("th", i > 1 && i !== 3 ? "num" : "", h)));
+    t.appendChild(head);
+    rows.forEach(p => {
+      const r = el("tr");
+      r.append(el("td", "", p.web_name + (p.news ? " (!)" : "")), el("td", "", p.pos),
+        el("td", "num", money(p.price)), el("td", "", p.fixture || "-"),
+        el("td", "num gain", Number(p.predicted_points).toFixed(1)));
+      t.appendChild(r);
+    });
+    box.replaceChildren(t);
+  } catch (e) { box.replaceChildren(el("p", "err", e.message)); }
+}
+$("posFilter").addEventListener("change", loadPlayers);
+
+/* ---------- chat ---------- */
+const thread = $("thread"), log = $("log"), input = $("input"), send = $("send");
+const history = [];
+["Who should I captain?", "Best transfers for my team?", "Best defenders under £5.5m?",
+ "Compare Saka and Palmer", "Does Arsenal have an easy run?"].forEach(q => {
+  const b = el("button", "chip", q); b.type = "button"; b.onclick = () => ask(q); $("chips").appendChild(b);
+});
+function render(text) {
+  if (window.marked && window.DOMPurify) return DOMPurify.sanitize(marked.parse(text));
+  const d = el("div", "", text); return d.innerHTML.replace(/\n/g, "<br>");
+}
+function addMsg(kind, text, html) {
+  const row = el("div", "msg " + (kind === "user" ? "user" : "bot " + kind));
+  const b = el("div", "bubble");
+  if (html) b.innerHTML = html; else b.textContent = text;
+  row.appendChild(b); thread.appendChild(row); log.scrollTop = log.scrollHeight;
+  return row;
+}
+async function ask(text) {
+  text = text.trim();
+  if (!text || send.disabled) return;
+  $("chips").hidden = true;
+  addMsg("user", text);
+  input.value = ""; input.style.height = "auto"; send.disabled = true;
+  const typing = addMsg("typing", "Thinking...");
+  const body = { message: text, history: history.slice(-10) };
+  const id = getTeamId(); if (id) body.team_id = id;
+  try {
+    const res = await fetch("/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    typing.remove();
+    if (!res.ok) addMsg("error", typeof data.detail === "string" ? data.detail : "Check your message is under 500 characters and try again.");
+    else { addMsg("ok", "", render(data.reply));
+      history.push({ role: "user", content: text }, { role: "assistant", content: data.reply }); }
+  } catch (err) { typing.remove(); addMsg("error", "Can't reach the server. Check that it's running and try again."); }
+  finally { send.disabled = false; input.focus(); }
+}
+$("form").addEventListener("submit", e => { e.preventDefault(); ask(input.value); });
+input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input.value); } });
+input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; });
+
+/* ---------- deadline countdown ---------- */
+let deadlineAt = null;
+const pad = n => String(n).padStart(2, "0");
+async function loadDeadline() {
+  try {
+    const d = await api("/deadline");
+    deadlineAt = new Date(d.deadline).getTime();
+    $("cdLabel").textContent = d.name + " deadline";
+    $("countdown").title = "Deadline: " + new Date(d.deadline).toLocaleString();
+    $("countdown").hidden = false;
+    tick();
+  } catch (e) { $("countdown").hidden = true; }
+}
+function tick() {
+  if (deadlineAt === null) return;
+  const ms = deadlineAt - Date.now();
+  if (ms <= 0) {
+    $("cdTime").textContent = "Deadline passed";
+    deadlineAt = null; setTimeout(loadDeadline, 60000); return;
+  }
+  const s = Math.floor(ms / 1000), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600),
+        m = Math.floor(s % 3600 / 60), sec = s % 60;
+  $("cdTime").textContent = (d ? d + "d " : "") + pad(h) + "h " + pad(m) + "m " + pad(sec) + "s";
+  $("countdown").classList.toggle("urgent", ms < 3600000);
+}
+setInterval(tick, 1000);
+loadDeadline();
+
+if (getTeamId()) $("loadForm").requestSubmit();
+</script>
+</body>
+</html>

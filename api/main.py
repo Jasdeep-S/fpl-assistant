@@ -8,7 +8,12 @@ from pydantic import BaseModel, Field
 from . import chat as chat_module
 from . import core
 
+from pathlib import Path
+from fastapi.responses import FileResponse
+
 app = FastAPI(title="FPL Gaffer API")
+
+
 
 
 def _handle(fn, *args, **kwargs):
@@ -22,7 +27,15 @@ def _handle(fn, *args, **kwargs):
         raise HTTPException(status_code=502, detail="FPL API unavailable, try again shortly")
 
 
-@app.get("/")
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+
+@app.get("/", include_in_schema=False)
+def home():
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/health")
 def health():
     return {"status": "ok"}
 
@@ -66,3 +79,7 @@ def chat_endpoint(req: ChatRequest):
         raise HTTPException(status_code=500,
                             detail="Something went wrong. Please try again.")
     return {"reply": reply}
+
+@app.get("/deadline")
+def deadline():
+    return _handle(core.next_deadline)
