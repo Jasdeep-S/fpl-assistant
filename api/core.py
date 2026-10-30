@@ -37,8 +37,10 @@ def _records(df: pd.DataFrame):
 
 
 def load_predictions() -> pd.DataFrame:
-    return pd.read_sql("SELECT * FROM predictions", engine)
-
+    preds = pd.read_sql("SELECT * FROM predictions", engine)
+    teams = pd.read_sql("SELECT id, short_name FROM raw_teams", engine)
+    teams = teams.rename(columns={"id": "team", "short_name": "team_short"})
+    return preds.merge(teams, on="team", how="left")
 
 def top_predictions(limit: int = 20, pos: Optional[str] = None,
                     max_price: Optional[float] = None,
@@ -151,8 +153,8 @@ def pick_lineup(team_id: int):
     pool = cap_pool if len(cap_pool) >= 2 else xi
     captain, vice = pool.iloc[0], pool.iloc[1]
 
-    cols = ["player_id", "web_name", "pos", "team_name", "fixture", "fdr",
-            "predicted_points"]
+    cols = ["player_id", "web_name", "pos", "team_name", "team_short", "price", "news","fixture", "fdr", "model_points", "predicted_points"]
+    
     return {
         "team_id": team_id,
         "gameweek": next_gw,

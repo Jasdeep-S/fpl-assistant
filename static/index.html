@@ -90,6 +90,19 @@ textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px soli
 .cd-label{font-size:.75rem;color:#9fc4ad}
 .cd-time{font-size:1.15rem;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums}
 .countdown.urgent .cd-time{color:#ff8a70}
+
+.player{cursor:pointer}
+.tip{position:fixed;z-index:50;width:250px;max-width:calc(100vw - 16px);background:var(--deep);color:var(--chalk);
+  border:1px solid var(--amber);border-radius:10px;padding:10px 12px;font-size:.82rem;
+  box-shadow:0 6px 20px rgba(0,0,0,.35);pointer-events:none}
+.tip[hidden]{display:none}
+.tip-name{font-weight:800;font-size:1rem}
+.tip-sub{color:#9fc4ad;margin-bottom:6px}
+.tip-row{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-top:1px solid rgba(244,246,234,.18)}
+.tip-row span:first-child{color:#9fc4ad;white-space:nowrap}
+.tip-row span:last-child{text-align:right}
+.tip-row .warn{color:#ff9d8a;font-weight:600}
+
 </style>
 </head>
 <body>
@@ -177,23 +190,77 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
 }));
 
 /* ---------- pitch ---------- */
-const POS_COLOR = { GK: "#f0a92e", DEF: "#2f6fb5", MID: "#f4f6ea", FWD: "#c8402f" };
-function shirt(pos) {
+// Club kits: [shirt colour, sleeve/stripe colour, striped?]. Keyed by FPL short name.
+// Unknown clubs fall back to grey, so a promoted club never breaks the page.
+const KITS = {
+  ARS:["#ef0107","#ffffff"], AVL:["#670e36","#95bfe5"], BOU:["#da291c","#111111",1],
+  BRE:["#e30613","#ffffff",1], BHA:["#0057b8","#ffffff",1], BUR:["#6c1d45","#99d6ea"],
+  CHE:["#034694","#ffffff"], CRY:["#1b458f","#c4122e",1], EVE:["#003399","#ffffff"],
+  FUL:["#ffffff","#111111"], HUL:["#f5a31a","#111111"], IPS:["#3a64a3","#ffffff"],
+  LEE:["#ffffff","#1d428a"], LEI:["#003090","#ffffff"], LIV:["#c8102e","#ffffff"],
+  MCI:["#6cabdd","#ffffff"], MUN:["#da291c","#111111"], NEW:["#ffffff","#111111",1],
+  NFO:["#dd0000","#ffffff"], SOU:["#d71920","#ffffff",1], SUN:["#eb172b","#ffffff",1],
+  TOT:["#ffffff","#132257"], WHU:["#7a263a","#1bb1e7"], WOL:["#fdb913","#111111"]
+};
+const GK_KIT = ["#f0a92e", "#0c3324"];
+const kitFor = p => p.pos === "GK" ? GK_KIT : (KITS[p.team_short] || ["#9aa79f", "#5a6d60"]);
+ 
+function shirt(p) {
+  const [body, trim, stripes] = kitFor(p);
   const s = el("span", "shirt");
-  s.innerHTML = '<svg viewBox="0 0 40 36" aria-hidden="true"><path d="M12 2 2 8l4 8 4-2v20h20V14l4 2 4-8-10-6q-8 6-16 0Z" fill="' +
-    (POS_COLOR[pos] || "#fff") + '" stroke="#0c3324" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+  s.innerHTML = '<svg viewBox="0 0 40 36" aria-hidden="true">' +
+    '<path d="M12 2 10 14V34H30V14L28 2Q20 8 12 2Z" fill="' + body + '"/>' +
+    (stripes ? '<path d="M13.5 8h4v26h-4ZM22.5 8h4v26h-4Z" fill="' + trim + '"/>' : '') +
+    '<path d="M12 2 2 8l4 8 4-2ZM28 2l10 6-4 8-4-2Z" fill="' + (stripes ? body : trim) + '"/>' +
+    '<path d="M12 2 2 8l4 8 4-2v20h20V14l4 2 4-8-10-6q-8 6-16 0Z" fill="none" stroke="#0c3324" stroke-width="1.5" stroke-linejoin="round"/></svg>';
   return s;
 }
+ 
+/* hover / focus / tap card with player details */
+const tip = el("div", "tip"); tip.hidden = true; tip.setAttribute("role", "tooltip");
+document.body.appendChild(tip);
+function tipRow(label, value, warn) {
+  const r = el("div", "tip-row");
+  r.append(el("span", "", label), el("span", warn ? "warn" : "", value));
+  return r;
+}
+function showTip(card, p) {
+  const pts = Number(p.predicted_points).toFixed(1) + " pts";
+  const modelNote = p.model_points !== undefined && Math.abs(p.model_points - p.predicted_points) > 0.05
+    ? " (model " + Number(p.model_points).toFixed(1) + ")" : "";
+  tip.replaceChildren(
+    el("div", "tip-name", p.web_name),
+    el("div", "tip-sub", (p.team_name || "") + " | " + p.pos + " | " + money(p.price)),
+    tipRow("Status", p.news ? p.news : "No injury news", !!p.news),
+    tipRow("Next fixture", (p.fixture || "-") + (p.fdr ? " (difficulty " + Math.round(p.fdr) + "/5)" : "")),
+    tipRow("Predicted", pts + modelNote));
+  tip.hidden = false;
+  const r = card.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+  const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+  let top = r.top - h - 8; if (top < 8) top = r.bottom + 8;
+  tip.style.left = left + "px"; tip.style.top = top + "px";
+}
+const hideTip = () => { tip.hidden = true; };
+document.addEventListener("click", e => { if (!e.target.closest(".player")) hideTip(); });
+window.addEventListener("scroll", hideTip, true);
+ 
 function playerCard(p, badge) {
   const c = el("div", "player");
-  const sh = shirt(p.pos);
+  c.tabIndex = 0;
+  c.setAttribute("aria-label", p.web_name + ", " + p.pos + ", " + (p.fixture || "no fixture") +
+    ", " + Number(p.predicted_points).toFixed(1) + " predicted points" + (p.news ? ", " + p.news : ""));
+  const sh = shirt(p);
   if (badge) sh.appendChild(el("span", "badge", badge));
   const info = el("div", "pinfo");
   const fdr = Math.min(5, Math.max(1, Math.round(p.fdr || 3)));
   info.appendChild(el("span", "fx fdr" + fdr, p.fixture || "-"));
   info.appendChild(el("span", "pts", Number(p.predicted_points).toFixed(1)));
   c.append(sh, el("div", "pname", p.web_name), info);
-  c.title = p.web_name + " (" + (p.team_name || "") + ")";
+  c.addEventListener("mouseenter", () => showTip(c, p));
+  c.addEventListener("focus", () => showTip(c, p));
+  c.addEventListener("click", () => showTip(c, p));
+  c.addEventListener("mouseleave", hideTip);
+  c.addEventListener("blur", hideTip);
   return c;
 }
 function renderLineup(d) {
@@ -218,7 +285,6 @@ function renderLineup(d) {
     document.createTextNode("GW" + d.gameweek + " expected: "), el("b", "", d.expected_points + " pts"),
     document.createTextNode(" | Captain: " + d.captain));
 }
-
 /* ---------- transfers ---------- */
 function renderTransfers(d) {
   const box = $("transfers");
