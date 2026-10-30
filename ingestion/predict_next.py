@@ -10,7 +10,6 @@ model = joblib.load("model.joblib")
 FEATURES = joblib.load("features.joblib")
 
 # Hand-picked heuristic, not learned from data: +/-5% per FDR step away from 3.
-# FDR 1 (easiest) -> +10%, FDR 5 (hardest) -> -10%.
 FDR_WEIGHT = 0.05
 
 hist = pd.read_sql("SELECT * FROM raw_player_history", engine)
@@ -59,41 +58,50 @@ games["fixture"] = (games["opp"].map(team_short)
                     + games["was_home"].map({1: " (H)", 0: " (A)"}))
 games = games.drop(columns="opp")
 
+# LEFT join: a club with no game this gameweek (a blank) keeps its players
 df = (players.rename(columns={"id": "player_id"})
       .merge(f, on="player_id")
-      .merge(games, on="team"))
+      .merge(games, on="team", how="left"))
+df["has_game"] = df["fdr"].notna()
+df["fdr"] = df["fdr"].fillna(3)
+df["was_home"] = df["was_home"].fillna(0)
+df["fixture"] = df["fixture"].fillna("BLANK")
 
 df["pos"] = df["element_type"].map({1: "GK", 2: "DEF", 3: "MID", 4: "FWD"})
-df["position"] = df["pos"]          # copy that get_dummies will turn into columns
+df["position"] = df["pos"]
 df["price"] = df["now_cost"]
 df = pd.get_dummies(df, columns=["position"])
 X = df.reindex(columns=FEATURES, fill_value=0).astype(float)
 
-# The model itself does not use fixture difficulty; it is applied afterwards
 df["model_points"] = model.predict(X)
 
-# NULL availability means no injury flag, so treat as 100% available
+# NULL availability means no injury flag, so treat as 100% available.
+# A blank gameweek means no game, so zero points.
 chance = pd.to_numeric(df["chance_of_playing_next_round"], errors="coerce").fillna(100) / 100
 fixture_factor = 1 + FDR_WEIGHT * (3 - df["fdr"])
-df["model_points"] = df["model_points"] * chance
+df["model_points"] = df["model_points"] * chance * df["has_game"].astype(float)
 df["predicted_points"] = df["model_points"] * fixture_factor
 df["team_name"] = df["team"].map(team_name)
 
-# A player with a double gameweek has two rows, so add them up
+# A double gameweek gives two rows per player, so add them up
 out = (df.groupby(["player_id", "web_name", "pos", "team", "team_name", "price", "news"],
                   dropna=False)
          .agg(predicted_points=("predicted_points", "sum"),
               model_points=("model_points", "sum"),
               fdr=("fdr", "mean"),
-              fixture=("fixture", lambda s: ", ".join(s)))
+              fixture=("fixture", lambda s: ", ".join(s)),
+              fixture_count=("has_game", "sum"))
          .reset_index()
          .sort_values("predicted_points", ascending=False))
+out["fixture_count"] = out["fixture_count"].astype(int)
 out["gameweek"] = next_gw
 out[["predicted_points", "model_points", "fdr"]] = \
     out[["predicted_points", "model_points", "fdr"]].round(3)
 
-print(out[["web_name", "pos", "fixture", "fdr", "model_points", "predicted_points"]]
+print(out[["web_name", "pos", "fixture", "fixture_count", "predicted_points"]]
       .head(20).to_string(index=False))
+print(f"\nDoubles: {(out['fixture_count'] > 1).sum()} players | "
+      f"Blanks: {(out['fixture_count'] == 0).sum()} players")
 
 out.to_sql("predictions", engine, if_exists="replace", index=False)
-print(f"\nSaved {len(out)} predictions for GW{next_gw} to table 'predictions'")
+print(f"Saved {len(out)} predictions for GW{next_gw} to table 'predictions'")

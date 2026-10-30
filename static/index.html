@@ -90,7 +90,6 @@ textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px soli
 .cd-label{font-size:.75rem;color:#9fc4ad}
 .cd-time{font-size:1.15rem;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums}
 .countdown.urgent .cd-time{color:#ff8a70}
-
 .player{cursor:pointer}
 .tip{position:fixed;z-index:50;width:250px;max-width:calc(100vw - 16px);background:var(--deep);color:var(--chalk);
   border:1px solid var(--amber);border-radius:10px;padding:10px 12px;font-size:.82rem;
@@ -102,7 +101,16 @@ textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px soli
 .tip-row span:first-child{color:#9fc4ad;white-space:nowrap}
 .tip-row span:last-child{text-align:right}
 .tip-row .warn{color:#ff9d8a;font-weight:600}
-
+.gwbar{background:#12402e;color:var(--chalk);padding:8px 20px;font-size:.86rem;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.gwbar[hidden]{display:none}
+.gwtag{border-radius:999px;padding:2px 10px;font-weight:600}
+.gwtag.dgw{background:var(--amber);color:var(--deep)}
+.gwtag.bgw{background:#d9523f;color:#fff}
+.lock{position:absolute;left:-10px;top:-4px;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--deep);
+  background:var(--chalk);font-size:.65rem;line-height:1;padding:0;cursor:pointer;display:grid;place-items:center}
+.lock[aria-pressed=true]{background:var(--amber)}
+.x2{position:absolute;left:-12px;bottom:0;background:var(--amber);color:var(--deep);font-size:.62rem;font-weight:800;
+  border-radius:4px;padding:0 3px;border:1px solid var(--deep)}
 </style>
 </head>
 <body>
@@ -115,6 +123,7 @@ textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px soli
     <button class="btn" id="loadBtn" type="submit">Load team</button>
   </form>
 </header>
+<div class="gwbar" id="gwbar" hidden></div>
 
 <div class="app">
   <section class="panel" aria-label="Your lineup">
@@ -182,6 +191,20 @@ const teamInput = $("teamId");
 try { teamInput.value = localStorage.getItem("teamId") || ""; } catch (e) {}
 const getTeamId = () => /^\d+$/.test(teamInput.value.trim()) ? parseInt(teamInput.value.trim(), 10) : null;
 
+/* ---------- locked players (saved in this browser) ---------- */
+let locked = new Set();
+try { locked = new Set(JSON.parse(localStorage.getItem("locked") || "[]")); } catch (e) {}
+const saveLocked = () => { try { localStorage.setItem("locked", JSON.stringify([...locked])); } catch (e) {} };
+let transferTimer = null;
+function toggleLock(p, btn) {
+  if (locked.has(p.player_id)) locked.delete(p.player_id); else locked.add(p.player_id);
+  saveLocked();
+  btn.setAttribute("aria-pressed", locked.has(p.player_id));
+  btn.textContent = locked.has(p.player_id) ? "\u{1F512}" : "\u{1F513}";
+  clearTimeout(transferTimer);
+  transferTimer = setTimeout(() => { const id = getTeamId(); if (id) loadTransfers(id); }, 400);
+}
+
 /* ---------- tabs ---------- */
 document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
   document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === t));
@@ -204,7 +227,7 @@ const KITS = {
 };
 const GK_KIT = ["#f0a92e", "#0c3324"];
 const kitFor = p => p.pos === "GK" ? GK_KIT : (KITS[p.team_short] || ["#9aa79f", "#5a6d60"]);
- 
+
 function shirt(p) {
   const [body, trim, stripes] = kitFor(p);
   const s = el("span", "shirt");
@@ -215,7 +238,7 @@ function shirt(p) {
     '<path d="M12 2 2 8l4 8 4-2v20h20V14l4 2 4-8-10-6q-8 6-16 0Z" fill="none" stroke="#0c3324" stroke-width="1.5" stroke-linejoin="round"/></svg>';
   return s;
 }
- 
+
 /* hover / focus / tap card with player details */
 const tip = el("div", "tip"); tip.hidden = true; tip.setAttribute("role", "tooltip");
 document.body.appendChild(tip);
@@ -243,7 +266,7 @@ function showTip(card, p) {
 const hideTip = () => { tip.hidden = true; };
 document.addEventListener("click", e => { if (!e.target.closest(".player")) hideTip(); });
 window.addEventListener("scroll", hideTip, true);
- 
+
 function playerCard(p, badge) {
   const c = el("div", "player");
   c.tabIndex = 0;
@@ -251,6 +274,13 @@ function playerCard(p, badge) {
     ", " + Number(p.predicted_points).toFixed(1) + " predicted points" + (p.news ? ", " + p.news : ""));
   const sh = shirt(p);
   if (badge) sh.appendChild(el("span", "badge", badge));
+  if (p.fixture_count > 1) sh.appendChild(el("span", "x2", "x" + p.fixture_count));
+  const lk = el("button", "lock", locked.has(p.player_id) ? "\u{1F512}" : "\u{1F513}");
+  lk.type = "button";
+  lk.setAttribute("aria-pressed", locked.has(p.player_id));
+  lk.setAttribute("aria-label", "Lock " + p.web_name + " so he is never suggested as a sell");
+  lk.addEventListener("click", e => { e.stopPropagation(); toggleLock(p, lk); });
+  sh.appendChild(lk);
   const info = el("div", "pinfo");
   const fdr = Math.min(5, Math.max(1, Math.round(p.fdr || 3)));
   info.appendChild(el("span", "fx fdr" + fdr, p.fixture || "-"));
@@ -285,12 +315,14 @@ function renderLineup(d) {
     document.createTextNode("GW" + d.gameweek + " expected: "), el("b", "", d.expected_points + " pts"),
     document.createTextNode(" | Captain: " + d.captain));
 }
+
 /* ---------- transfers ---------- */
 function renderTransfers(d) {
   const box = $("transfers");
   box.replaceChildren(el("p", "hint",
     "Bank " + "£" + Number(d.bank_millions).toFixed(1) + "m. Current XI: " + d.current_xi_points +
     " expected points. A transfer beyond your free one costs 4 points, so only take a hit for a gain above 4."));
+  if (d.locked && d.locked.length) box.appendChild(el("p", "hint", "Protected from selling: " + d.locked.join(", ") + "."));
   const t = el("table"), head = el("tr");
   ["Sell", "Buy", "Cost", "Gain", "Fixture"].forEach((h, i) => head.appendChild(el("th", i === 2 || i === 3 ? "num" : "", h)));
   t.appendChild(head);
@@ -306,19 +338,27 @@ function renderTransfers(d) {
 }
 
 /* ---------- load team ---------- */
+async function loadTransfers(id) {
+  $("transfers").replaceChildren(el("p", "hint", "Loading transfers..."));
+  try {
+    const q = locked.size ? "?locked=" + [...locked].join(",") : "";
+    renderTransfers(await api("/transfers/" + id + q));
+  } catch (err) { $("transfers").replaceChildren(el("p", "err", err.message)); }
+}
 $("loadForm").addEventListener("submit", async e => {
   e.preventDefault();
   const id = getTeamId();
   if (!id) { $("pitchEmpty")?.replaceChildren("Team ID must be a number, e.g. 1829025."); return; }
-  try { localStorage.setItem("teamId", String(id)); } catch (e) {}
+  try { localStorage.setItem("teamId", String(id)); } catch (e2) {}
   $("loadBtn").disabled = true; $("loadBtn").textContent = "Loading...";
-  $("transfers").replaceChildren(el("p", "hint", "Loading transfers..."));
-  const [lineup, transfers] = await Promise.allSettled([api("/lineup/" + id), api("/transfers/" + id)]);
-  if (lineup.status === "fulfilled") renderLineup(lineup.value);
-  else { const m = $("pitchEmpty") || el("div", "pitch-empty", ""); m.className = "pitch-empty err";
-    m.textContent = lineup.reason.message; if (!m.isConnected) $("pitch").appendChild(m); }
-  if (transfers.status === "fulfilled") renderTransfers(transfers.value);
-  else $("transfers").replaceChildren(el("p", "err", transfers.reason.message));
+  const transfersDone = loadTransfers(id);
+  try { renderLineup(await api("/lineup/" + id)); }
+  catch (err) {
+    const m = $("pitchEmpty") || el("div", "pitch-empty", "");
+    m.className = "pitch-empty err"; m.textContent = err.message;
+    if (!m.isConnected) $("pitch").appendChild(m);
+  }
+  await transfersDone;
   $("loadBtn").disabled = false; $("loadBtn").textContent = "Load team";
 });
 
@@ -371,6 +411,7 @@ async function ask(text) {
   const typing = addMsg("typing", "Thinking...");
   const body = { message: text, history: history.slice(-10) };
   const id = getTeamId(); if (id) body.team_id = id;
+  if (locked.size) body.locked = [...locked].slice(0, 15);
   try {
     const res = await fetch("/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
@@ -412,6 +453,22 @@ function tick() {
 }
 setInterval(tick, 1000);
 loadDeadline();
+
+/* ---------- double / blank gameweek banner ---------- */
+async function loadGwFlags() {
+  const bar = $("gwbar");
+  try {
+    const d = await api("/gameweeks");
+    bar.replaceChildren();
+    if (!d.flags.length) bar.appendChild(el("span", "", "No double or blank gameweeks in GW" + d.from_gameweek + " to GW" + d.to_gameweek + "."));
+    d.flags.forEach(f => {
+      if (f.double.length) bar.appendChild(el("span", "gwtag dgw", "GW" + f.gameweek + " double: " + f.double.join(", ")));
+      if (f.blank.length) bar.appendChild(el("span", "gwtag bgw", "GW" + f.gameweek + " blank: " + f.blank.join(", ")));
+    });
+    bar.hidden = false;
+  } catch (e) { bar.hidden = true; }
+}
+loadGwFlags();
 
 if (getTeamId()) $("loadForm").requestSubmit();
 </script>

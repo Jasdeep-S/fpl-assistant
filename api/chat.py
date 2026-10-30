@@ -9,26 +9,31 @@ from google.genai import errors, types
 
 from . import core
 
+warnings.filterwarnings("ignore", message=".*non-text parts.*")
+load_dotenv()
+
+
 class AssistantBusy(Exception):
     """Raised when every model in the fallback list is overloaded or unavailable."""
 
 
-warnings.filterwarnings("ignore", message=".*non-text parts.*")
-load_dotenv()
-
+# 30-second timeout (in milliseconds) so a stuck call raises an error instead of freezing
 client = genai.Client(
     api_key=os.environ["GEMINI_API_KEY"],
     http_options=types.HttpOptions(timeout=30000),
 )
 
+# Tried in order. If one is overloaded or unavailable, the next is used.
 MODELS = [
     os.environ.get("GEMINI_MODEL", "gemini-3.8-flash"),
     "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
 ]
+
+# Status codes that mean "try the next model"
 RETRY_CODES = (404, 408, 429, 500, 502, 503, 504)
 
-SYSTEM = """You are FPL Gaffer, a Fantasy Premier League assistant.
+SYSTEM = """You are TheDugout, a Fantasy Premier League assistant.
 
 Rules:
 - All numbers (predicted points, gains, prices, fixtures) must come from the tools. Never invent stats.
@@ -37,8 +42,14 @@ Rules:
   about +/-10% for FPL's fixture difficulty rating (fdr, 1 = easiest, 5 = hardest), and scaled
   by injury availability. The fixture adjustment is a simple rule of thumb, not a learned effect,
   so say so if asked. Predictions cover only the next gameweek.
+- Only describe a fixture as easy or hard if the fdr supports it (1-2 easy, 4-5 hard).
 - For questions about upcoming runs of fixtures, use get_fixtures.
+- For double or blank gameweek questions, use get_gameweek_flags. Predictions already count a
+  double gameweek as two fixtures added together, and a blank as zero points. Future gameweeks
+  can change, so say the data may be provisional.
 - If the user gives a budget (e.g. "I have 2.5m"), pass it as budget_millions to suggest_transfers.
+- If the message lists locked player IDs, pass them to suggest_transfers as locked_player_ids.
+  Locked players are never suggested as sells.
 - If the user has given a team ID, use it for lineup and transfer questions. If they ask about
   their team and no ID is available, ask them for it.
 - Prices from tools are in tenths of a million (100 = £10.0m); show them as £x.xm.
@@ -88,6 +99,15 @@ def get_fixtures(team: str, num_gameweeks: int = 5) -> dict:
         return {"error": str(e)}
 
 
+def get_gameweek_flags(num_gameweeks: int = 6) -> dict:
+    """Which clubs have a double gameweek (two fixtures) or a blank gameweek
+    (no fixture) in the next few gameweeks."""
+    try:
+        return core.gameweek_flags(min(num_gameweeks, 10))
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def get_lineup(team_id: int) -> dict:
     """Best starting XI, captain, vice-captain and bench order for a user's FPL team ID."""
     try:
@@ -96,30 +116,41 @@ def get_lineup(team_id: int) -> dict:
         return {"error": str(e)}
 
 
-def suggest_transfers(team_id: int, budget_millions: float = -1) -> dict:
+def suggest_transfers(team_id: int, budget_millions: float = -1,
+                      locked_player_ids: Optional[List[int]] = None) -> dict:
     """Best single transfers for a user's FPL team ID, with the expected gain in XI points.
-    Optionally pass budget_millions (money in the bank, e.g. 2.5) to override the
-    real bank balance; leave at -1 to use the real one."""
+    Optionally pass budget_millions (money in the bank, e.g. 2.5) to override the real bank
+    balance; leave at -1 to use the real one. If the user's message lists locked player IDs,
+    pass them as locked_player_ids: those players are never suggested as sells."""
     try:
         return core.suggest_transfers(
-            team_id, bank_override=budget_millions if budget_millions >= 0 else None)
+            team_id,
+            bank_override=budget_millions if budget_millions >= 0 else None,
+            locked=set(locked_player_ids or []))
     except Exception as e:
         return {"error": str(e)}
 
 
-TOOLS = [get_top_predictions, get_player, compare_players,
-         get_fixtures, get_lineup, suggest_transfers]
+TOOLS = [get_top_predictions, get_player, compare_players, get_fixtures,
+         get_gameweek_flags, get_lineup, suggest_transfers]
 
 
-def chat(message: str, team_id: Optional[int] = None, history: Optional[list] = None) -> str:
+def chat(message: str, team_id: Optional[int] = None, history: Optional[list] = None,
+         locked: Optional[List[int]] = None) -> str:
     contents = []
     for turn in history or []:
         role = "model" if turn.get("role") == "assistant" else "user"
         contents.append(types.Content(
             role=role, parts=[types.Part(text=str(turn.get("content", "")))]))
 
-    text = message if team_id is None else f"[User's team ID: {team_id}]\n{message}"
-    contents.append(types.Content(role="user", parts=[types.Part(text=text)]))
+    # Context the user can't be trusted to type correctly is added by the app
+    prefix = ""
+    if team_id is not None:
+        prefix += f"[User's team ID: {team_id}]\n"
+    if locked:
+        prefix += f"[User's locked player IDs: {list(locked)}]\n"
+    contents.append(types.Content(
+        role="user", parts=[types.Part(text=prefix + message)]))
 
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM,

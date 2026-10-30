@@ -13,8 +13,7 @@ engine = create_engine(os.environ["DATABASE_URL"])
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 POSITIONS = ["GK", "DEF", "MID", "FWD"]
 
-PLAYER_COLS = ["player_id", "web_name", "pos", "team_name", "price", "news",
-               "fixture", "fdr", "model_points", "predicted_points"]
+PLAYER_COLS = ["player_id", "web_name", "pos", "team_name", "price", "news", "fixture", "fdr", "model_points", "predicted_points", "fixture_count"]
 
 
 class TeamNotFound(Exception):
@@ -153,8 +152,8 @@ def pick_lineup(team_id: int):
     pool = cap_pool if len(cap_pool) >= 2 else xi
     captain, vice = pool.iloc[0], pool.iloc[1]
 
-    cols = ["player_id", "web_name", "pos", "team_name", "team_short", "price", "news","fixture", "fdr", "model_points", "predicted_points"]
-    
+    cols = ["player_id", "web_name", "pos", "team_name", "team_short", "price", "news","fixture", "fdr", "model_points", "predicted_points", "fixture_count"]
+
     return {
         "team_id": team_id,
         "gameweek": next_gw,
@@ -187,17 +186,21 @@ def best_xi_points(df: pd.DataFrame) -> float:
 
 
 def suggest_transfers(team_id: int, top_n: int = 8,
-                      bank_override: Optional[float] = None):
-    """bank_override is in millions (e.g. 2.5) and replaces the real bank balance."""
+                      bank_override: Optional[float] = None,
+                      locked: Optional[set] = None):
+    """bank_override is in millions (e.g. 2.5). locked is a set of player IDs never to sell."""
+    locked = set(locked or [])
     preds = load_predictions()
     squad, squad_ids, bank, next_gw = fetch_squad(team_id, preds)
     if bank_override is not None:
-        bank = int(round(bank_override * 10))   # £2.5m -> 25 (tenths of a million)
+        bank = int(round(bank_override * 10))
     base = best_xi_points(squad)
     team_counts = squad["team"].value_counts().to_dict()
     suggestions = []
 
     for _, out in squad.iterrows():
+        if out["player_id"] in locked:
+            continue
         budget = bank + out["price"]  # approximation: sells at current price
         pool = preds[(preds["pos"] == out["pos"])
                      & (~preds["player_id"].isin(squad_ids))
@@ -227,5 +230,32 @@ def suggest_transfers(team_id: int, top_n: int = 8,
         "gameweek": next_gw,
         "bank_millions": bank / 10,
         "current_xi_points": round(float(base), 2),
+        "locked": squad[squad["player_id"].isin(locked)]["web_name"].tolist(),
         "suggestions": suggestions[:top_n],
     }
+
+def gameweek_flags(num_gameweeks: int = 6):
+    """Doubles and blanks for the next few gameweeks, from the fixtures table."""
+    gws = pd.read_sql("SELECT id, is_next FROM raw_gameweeks", engine)
+    nxt = gws.loc[gws["is_next"], "id"]
+    if nxt.empty:
+        raise ValueError("No upcoming gameweek found (season may be over)")
+    next_gw = int(nxt.iloc[0])
+
+    teams = pd.read_sql("SELECT id, short_name FROM raw_teams", engine)
+    short = dict(zip(teams["id"], teams["short_name"]))
+    # Fixtures with no gameweek yet (postponed, unscheduled) have a NULL event
+    fx = pd.read_sql(
+        "SELECT event, team_h, team_a FROM raw_fixtures WHERE event IS NOT NULL", engine)
+
+    last_gw = min(next_gw + num_gameweeks - 1, 38)
+    flags = []
+    for gw in range(next_gw, last_gw + 1):
+        g = fx[fx["event"] == gw]
+        counts = pd.concat([g["team_h"], g["team_a"]]).value_counts()
+        doubles = sorted(short[t] for t, c in counts.items() if c >= 2)
+        blanks = sorted(short[t] for t in teams["id"] if t not in counts.index)
+        if doubles or blanks:
+            flags.append({"gameweek": gw, "double": doubles, "blank": blanks})
+    return {"from_gameweek": next_gw, "to_gameweek": last_gw, "flags": flags,
+            "note": "Based on current FPL fixture data; future gameweeks can change."}
