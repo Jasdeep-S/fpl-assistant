@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
 :root{--deep:#0c3324;--turf:#1f6b43;--chalk:#f4f6ea;--amber:#f0a92e;--bg:#e6ebdc;
   --surface:#f8f9f2;--ink:#12241b;--muted:#5a6d60;--line:#ccd6c0;--red:#c8402f}
@@ -111,13 +112,37 @@ textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px soli
 .lock[aria-pressed=true]{background:var(--amber)}
 .x2{position:absolute;left:-12px;bottom:0;background:var(--amber);color:var(--deep);font-size:.62rem;font-weight:800;
   border-radius:4px;padding:0 3px;border:1px solid var(--deep)}
+.loader[hidden],.who[hidden],.app[hidden],.auth[hidden]{display:none}
+.who{display:flex;gap:10px;align-items:center;font-size:.85rem}
+.who button{padding:5px 12px}
+.auth{max-width:420px;margin:48px auto;padding:24px;background:var(--surface);border:1px solid var(--line);border-radius:12px;text-align:center}
+.auth h2{margin:0 0 6px}
+.auth p{margin:0}
+.auth .sub{color:var(--muted);font-size:.9rem;margin-bottom:16px}
+.auth form{margin-top:6px}
+.auth label{display:block;text-align:left;font-size:.85rem;font-weight:600;margin:12px 0 4px}
+.auth input{width:100%;padding:9px 10px;border-radius:8px;border:1.5px solid var(--line);background:#fff}
+.pw{position:relative}
+.pw input{padding-right:64px}
+.pw button{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--turf);font-weight:600;cursor:pointer;padding:4px 8px}
+.btn.wide{width:100%;margin-top:16px;padding:10px 16px}
+.btn-google{width:100%;padding:10px 16px;border-radius:6px;border:1.5px solid var(--line);background:#fff;color:var(--ink);font-weight:600;cursor:pointer}
+.btn-google:hover{background:#f1f4ea}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.8rem;margin:14px 0}
+.or::before,.or::after{content:"";flex:1;border-top:1px solid var(--line)}
+.seg{display:flex;border:1.5px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;background:#fff;padding:8px;font-weight:600;cursor:pointer;color:var(--muted)}
+.seg button[aria-selected=true]{background:var(--deep);color:var(--chalk)}
+.linkbtn{border:0;background:none;color:var(--turf);text-decoration:underline;cursor:pointer;margin-top:12px;font-size:.88rem}
+.linkbtn[hidden]{display:none}
 </style>
 </head>
 <body>
 <header>
   <div class="brand"><h1>TheDugout</h1><span class="tag">FPL Assistant</span></div>
   <div class="countdown" id="countdown" hidden><span class="cd-label" id="cdLabel"></span><span class="cd-time" id="cdTime"></span></div>
-  <form class="loader" id="loadForm">
+  <div class="who" id="who" hidden><span id="email"></span><button class="btn" id="signOut" type="button">Sign out</button></div>
+  <form class="loader" id="loadForm" hidden>
     <label for="teamId" style="font-size:.9rem">Team ID</label>
     <input id="teamId" inputmode="numeric" placeholder="e.g. 1829025">
     <button class="btn" id="loadBtn" type="submit">Load team</button>
@@ -125,7 +150,40 @@ textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px soli
 </header>
 <div class="gwbar" id="gwbar" hidden></div>
 
-<div class="app">
+<section class="auth" id="auth" hidden>
+  <h2>Sign in to TheDugout</h2>
+  <p class="sub">Your team, locked players and assistant, saved to your account.</p>
+  <button class="btn-google" id="googleBtn" type="button">Continue with Google</button>
+  <div class="or"><span>or</span></div>
+  <div class="seg" role="tablist" aria-label="Sign in or create an account">
+    <button type="button" id="modeIn" role="tab" aria-selected="true">Sign in</button>
+    <button type="button" id="modeUp" role="tab" aria-selected="false">Create account</button>
+  </div>
+  <form id="authForm" novalidate>
+    <label for="authEmail">Email</label>
+    <input id="authEmail" type="email" autocomplete="email">
+    <label for="authPass">Password</label>
+    <div class="pw">
+      <input id="authPass" type="password" autocomplete="current-password">
+      <button type="button" id="pwToggle" aria-label="Show password">Show</button>
+    </div>
+    <button class="btn wide" id="authSubmit" type="submit">Sign in</button>
+  </form>
+  <button class="linkbtn" id="forgotBtn" type="button">Forgot password?</button>
+  <p class="hint" id="authMsg" role="status" style="margin-top:10px"></p>
+</section>
+
+<section class="auth" id="recover" hidden>
+  <h2>Choose a new password</h2>
+  <form id="recoverForm" novalidate>
+    <label for="newPass">New password</label>
+    <input id="newPass" type="password" autocomplete="new-password">
+    <button class="btn wide" type="submit">Update password</button>
+  </form>
+  <p class="hint" id="recoverMsg" role="status" style="margin-top:10px"></p>
+</section>
+
+<div class="app" id="app" hidden>
   <section class="panel" aria-label="Your lineup">
     <div class="panel-head" id="pitchHead"><span>Your best XI</span><span id="pitchSummary"></span></div>
     <div class="pitch" id="pitch">
@@ -180,25 +238,42 @@ function el(tag, cls, text) {
   if (text !== undefined) n.textContent = text;
   return n;
 }
-async function api(path) {
-  const r = await fetch(path);
+
+const SUPABASE_URL = "https://iooqsgljzerpbtrrblrj.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_SGv85FawJq6G4N5_qlZ_vg_aEr1gT4m";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let accessToken = null;
+
+async function api(path, opts) {
+  opts = opts || {};
+  const headers = Object.assign({}, opts.headers || {});
+  if (accessToken) headers["Authorization"] = "Bearer " + accessToken;
+  const r = await fetch(path, Object.assign({}, opts, { headers }));
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "Request failed");
+  if (!r.ok) {
+    if (r.status === 401 && accessToken) setTimeout(() => sb.auth.signOut(), 0);
+    throw new Error(typeof d.detail === "string" ? d.detail : "Request failed");
+  }
   return d;
 }
 const money = tenths => "£" + (tenths / 10).toFixed(1) + "m";
 const teamInput = $("teamId");
-try { teamInput.value = localStorage.getItem("teamId") || ""; } catch (e) {}
 const getTeamId = () => /^\d+$/.test(teamInput.value.trim()) ? parseInt(teamInput.value.trim(), 10) : null;
 
 /* ---------- locked players (saved in this browser) ---------- */
 let locked = new Set();
-try { locked = new Set(JSON.parse(localStorage.getItem("locked") || "[]")); } catch (e) {}
-const saveLocked = () => { try { localStorage.setItem("locked", JSON.stringify([...locked])); } catch (e) {} };
+let prefsTimer = null;
+function savePrefs() {
+  clearTimeout(prefsTimer);
+  prefsTimer = setTimeout(() => {
+    api("/me", { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ team_id: getTeamId(), locked: [...locked].slice(0, 30) }) }).catch(err => console.warn("Could not save preferences:", err.message));
+  }, 600);
+}
 let transferTimer = null;
 function toggleLock(p, btn) {
   if (locked.has(p.player_id)) locked.delete(p.player_id); else locked.add(p.player_id);
-  saveLocked();
+  savePrefs();
   btn.setAttribute("aria-pressed", locked.has(p.player_id));
   btn.textContent = locked.has(p.player_id) ? "\u{1F512}" : "\u{1F513}";
   clearTimeout(transferTimer);
@@ -349,7 +424,7 @@ $("loadForm").addEventListener("submit", async e => {
   e.preventDefault();
   const id = getTeamId();
   if (!id) { $("pitchEmpty")?.replaceChildren("Team ID must be a number, e.g. 1829025."); return; }
-  try { localStorage.setItem("teamId", String(id)); } catch (e2) {}
+  savePrefs();
   $("loadBtn").disabled = true; $("loadBtn").textContent = "Loading...";
   const transfersDone = loadTransfers(id);
   try { renderLineup(await api("/lineup/" + id)); }
@@ -413,7 +488,7 @@ async function ask(text) {
   const id = getTeamId(); if (id) body.team_id = id;
   if (locked.size) body.locked = [...locked].slice(0, 15);
   try {
-    const res = await fetch("/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const res = await fetch("/chat", { method: "POST", headers: Object.assign({ "Content-Type": "application/json" }, accessToken ? { Authorization: "Bearer " + accessToken } : {}), body: JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
     typing.remove();
     if (!res.ok) addMsg("error", typeof data.detail === "string" ? data.detail : "Check your message is under 500 characters and try again.");
@@ -470,7 +545,114 @@ async function loadGwFlags() {
 }
 loadGwFlags();
 
-if (getTeamId()) $("loadForm").requestSubmit();
+/* ---------- sign in / sign out ---------- */
+let currentUserId = null, recovering = false, authMode = "in";
+async function loadMe() {
+  try {
+    const me = await api("/me");
+    if (me.team_id) teamInput.value = me.team_id;
+    locked = new Set(me.locked || []);
+    if (getTeamId()) $("loadForm").requestSubmit();
+  } catch (e) { console.warn("Could not load preferences:", e.message); }
+}
+function setSignedIn(session) {
+  if (recovering) return;
+  const on = !!session;
+  if (!on && currentUserId) { location.reload(); return; }
+  accessToken = on ? session.access_token : null;
+  $("auth").hidden = on; $("recover").hidden = true;
+  $("app").hidden = !on; $("who").hidden = !on; $("loadForm").hidden = !on;
+  if (on) {
+    $("email").textContent = session.user.email || "";
+    if (session.user.id !== currentUserId) { currentUserId = session.user.id; loadMe(); }
+  }
+}
+
+const msgEl = $("authMsg");
+function authMsg(text, isErr) { msgEl.textContent = text; msgEl.className = "hint" + (isErr ? " err" : ""); }
+function friendly(err) {
+  const m = (err && err.message) || "Something went wrong. Please try again.";
+  if (/invalid login/i.test(m)) return "Incorrect email or password.";
+  if (/not confirmed/i.test(m)) return "Please confirm your email first. Check your inbox.";
+  if (/rate limit|too many/i.test(m)) return "Too many attempts. Please wait a minute and try again.";
+  return m;
+}
+function setMode(mode) {
+  authMode = mode;
+  $("modeIn").setAttribute("aria-selected", mode === "in");
+  $("modeUp").setAttribute("aria-selected", mode === "up");
+  $("authSubmit").textContent = mode === "in" ? "Sign in" : "Create account";
+  $("authPass").autocomplete = mode === "in" ? "current-password" : "new-password";
+  $("forgotBtn").hidden = mode !== "in";
+  authMsg("", false);
+}
+$("modeIn").addEventListener("click", () => setMode("in"));
+$("modeUp").addEventListener("click", () => setMode("up"));
+$("pwToggle").addEventListener("click", () => {
+  const p = $("authPass"), show = p.type === "password";
+  p.type = show ? "text" : "password";
+  $("pwToggle").textContent = show ? "Hide" : "Show";
+  $("pwToggle").setAttribute("aria-label", show ? "Hide password" : "Show password");
+});
+
+$("authForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const email = $("authEmail").value.trim(), password = $("authPass").value;
+  if (!email || !password) { authMsg("Enter your email and password.", true); return; }
+  if (authMode === "up" && password.length < 8) { authMsg("Use at least 8 characters for your password.", true); return; }
+  $("authSubmit").disabled = true; authMsg("", false);
+  if (authMode === "in") {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) authMsg(friendly(error), true);
+  } else {
+    const { data, error } = await sb.auth.signUp({ email, password,
+      options: { emailRedirectTo: window.location.origin + "/" } });
+    if (error) authMsg(friendly(error), true);
+    else if (!data.session) authMsg("Check your email to confirm your account, then sign in.", false);
+  }
+  $("authSubmit").disabled = false;
+});
+
+$("googleBtn").addEventListener("click", async () => {
+  const { error } = await sb.auth.signInWithOAuth({ provider: "google",
+    options: { redirectTo: window.location.origin + "/" } });
+  if (error) authMsg(friendly(error), true);
+});
+
+$("forgotBtn").addEventListener("click", async () => {
+  const email = $("authEmail").value.trim();
+  if (!email) { authMsg("Enter your email above first.", true); return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + "/" });
+  if (error) authMsg(friendly(error), true);
+  else authMsg("If that email has an account, we've sent a link to reset your password.", false);
+});
+
+$("recoverForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const msg = $("recoverMsg"), pw = $("newPass").value;
+  if (pw.length < 8) { msg.textContent = "Use at least 8 characters."; msg.className = "hint err"; return; }
+  const { error } = await sb.auth.updateUser({ password: pw });
+  if (error) { msg.textContent = friendly(error); msg.className = "hint err"; return; }
+  recovering = false;
+  const { data } = await sb.auth.getSession();
+  setSignedIn(data.session);
+});
+
+$("signOut").addEventListener("click", () => sb.auth.signOut());
+if (SUPABASE_URL.includes("YOUR-PROJECT")) {
+  authMsg("Setup needed: add your Supabase URL and key near the top of the script.", true);
+}
+sb.auth.onAuthStateChange((event, session) => setTimeout(() => {
+  if (event === "PASSWORD_RECOVERY") {
+    recovering = true;
+    accessToken = session ? session.access_token : null;
+    $("auth").hidden = true; $("app").hidden = true; $("recover").hidden = false;
+    return;
+  }
+  setSignedIn(session);
+}, 0));
+// Show the sign-in card if there is no saved session
+sb.auth.getSession().then(({ data }) => { if (!data.session) setSignedIn(null); });
 </script>
 </body>
 </html>
