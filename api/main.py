@@ -18,6 +18,9 @@ from . import core
 load_dotenv()
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
+CHAT_DAILY_LIMIT = int(os.environ.get("CHAT_DAILY_LIMIT", "20"))
+CHAT_GLOBAL_DAILY_LIMIT = int(os.environ.get("CHAT_GLOBAL_DAILY_LIMIT", "300"))
+TODAY = "(now() AT TIME ZONE 'UTC')::date"   # usage resets at midnight UTC
 
 app = FastAPI(title="TheDugout API")
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -32,6 +35,12 @@ def create_tables():
                 team_id INT,
                 locked JSONB NOT NULL DEFAULT '[]',
                 updated_at TIMESTAMPTZ DEFAULT now())"""))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS chat_usage (
+                user_id TEXT NOT NULL,
+                day DATE NOT NULL,
+                count INT NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, day))"""))
 
 
 # ---------- authentication ----------
@@ -65,6 +74,45 @@ def current_user(authorization: Optional[str] = Header(None)) -> dict:
         _token_cache.clear()
     _token_cache[token] = (user, time.time() + 60)  # re-check with Supabase every minute
     return user
+
+
+# ---------- chat limits ----------
+def reserve_chat(user_id: str) -> int:
+    """Counts one message for today and returns how many the user has left.
+    Raises 429 if a limit is reached. Raising inside the transaction rolls the count back."""
+    with core.engine.begin() as conn:
+        total = conn.execute(text(
+            f"SELECT COALESCE(SUM(count), 0) FROM chat_usage WHERE day = {TODAY}")).scalar()
+        if total >= CHAT_GLOBAL_DAILY_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail="TheDugout has reached its daily chat limit. Please try again tomorrow.")
+        used = conn.execute(text(f"""
+            INSERT INTO chat_usage (user_id, day, count) VALUES (:u, {TODAY}, 1)
+            ON CONFLICT (user_id, day) DO UPDATE SET count = chat_usage.count + 1
+            RETURNING count"""), {"u": user_id}).scalar()
+        if used > CHAT_DAILY_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail=f"You've used your {CHAT_DAILY_LIMIT} chat messages for today. "
+                       "It resets at midnight UTC.")
+    return CHAT_DAILY_LIMIT - used
+
+
+def refund_chat(user_id: str) -> None:
+    """Gives the message back when the assistant failed, so errors aren't charged."""
+    with core.engine.begin() as conn:
+        conn.execute(text(
+            f"UPDATE chat_usage SET count = GREATEST(count - 1, 0) "
+            f"WHERE user_id = :u AND day = {TODAY}"), {"u": user_id})
+
+
+def chat_remaining(user_id: str) -> int:
+    with core.engine.begin() as conn:
+        used = conn.execute(text(
+            f"SELECT COALESCE(SUM(count), 0) FROM chat_usage "
+            f"WHERE user_id = :u AND day = {TODAY}"), {"u": user_id}).scalar()
+    return max(CHAT_DAILY_LIMIT - int(used), 0)
 
 
 def _handle(fn, *args, **kwargs):
@@ -133,7 +181,8 @@ def me(user: dict = Depends(current_user)):
                            {"u": user["id"]}).first()
     return {"email": user["email"],
             "team_id": row[0] if row else None,
-            "locked": row[1] if row else []}
+            "locked": row[1] if row else [],
+            "chat_remaining": chat_remaining(user["id"])}
 
 
 @app.put("/me")
@@ -170,12 +219,15 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 def chat_endpoint(req: ChatRequest, user: dict = Depends(current_user)):
+    remaining = reserve_chat(user["id"])        # 429 here if a limit is reached
     try:
         reply = chat_module.chat(req.message, req.team_id, req.history, req.locked)
     except chat_module.AssistantBusy as e:
+        refund_chat(user["id"])                 # not the user's fault, so don't charge
         raise HTTPException(status_code=503, detail=str(e))
     except Exception:
+        refund_chat(user["id"])
         logging.exception("Chat failed")
         raise HTTPException(status_code=500,
                             detail="Something went wrong. Please try again.")
-    return {"reply": reply}
+    return {"reply": reply, "remaining": remaining}

@@ -135,9 +135,31 @@ textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px soli
 .seg button[aria-selected=true]{background:var(--deep);color:var(--chalk)}
 .linkbtn{border:0;background:none;color:var(--turf);text-decoration:underline;cursor:pointer;margin-top:12px;font-size:.88rem}
 .linkbtn[hidden]{display:none}
+body.signed-out header,body.signed-out .gwbar{display:none}
+.landing{display:grid;grid-template-columns:1.15fr 1fr;min-height:100vh}
+.landing[hidden]{display:none}
+.hero{position:relative;overflow:hidden;background:linear-gradient(160deg,#0c3324,#145239);color:var(--chalk);padding:64px;display:flex;flex-direction:column;justify-content:center;gap:26px}
+.hero>*{position:relative}
+.hero>svg.pitch-art{position:absolute;right:-90px;bottom:-60px;width:560px;height:auto;opacity:.16;pointer-events:none}
+.hero .wm{display:flex;align-items:baseline;gap:10px}
+.hero .wm b{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
+.hero .wm span{font-size:.9rem;font-weight:600;color:#00ff87}
+.hero h1{margin:0;font-size:3.5rem;line-height:1.05;font-weight:800;letter-spacing:-.03em}
+.hero p.lead{margin:0;font-size:1.12rem;line-height:1.5;color:#c3dccb;max-width:520px}
+.feat{display:grid;grid-template-columns:1fr 1fr;gap:22px 28px;max-width:560px}
+.feat b{display:block;color:#00ff87;font-size:1rem;font-weight:800}
+.feat span{display:block;margin-top:4px;font-size:.88rem;line-height:1.45;color:#c3dccb}
+.signin-side{background:var(--bg);display:flex;align-items:center;justify-content:center;padding:48px 24px}
+.auth.landing-card{margin:0;max-width:400px;width:100%;padding:36px;background:#fff;border:0;border-radius:16px;box-shadow:0 8px 30px rgba(12,51,36,.16);text-align:left}
+.auth.landing-card h2{font-size:1.6rem;font-weight:800;color:var(--deep);margin:0 0 6px}
+.auth.landing-card .sub{margin-bottom:20px}
+.auth.landing-card input,.auth.landing-card .btn-google,.auth.landing-card .seg{border-color:#6f8577}
+.btn.neon{background:#00ff87;color:#0c3324;font-weight:800;font-size:1rem}
+.center{text-align:center}
+@media(max-width:900px){.landing{grid-template-columns:1fr;min-height:0}.hero{padding:40px 24px}.hero h1{font-size:2.4rem}.feat{grid-template-columns:1fr}}
 </style>
 </head>
-<body>
+<body class="signed-out">
 <header>
   <div class="brand"><h1>TheDugout</h1><span class="tag">FPL Assistant</span></div>
   <div class="countdown" id="countdown" hidden><span class="cd-label" id="cdLabel"></span><span class="cd-time" id="cdTime"></span></div>
@@ -150,27 +172,43 @@ textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px soli
 </header>
 <div class="gwbar" id="gwbar" hidden></div>
 
-<section class="auth" id="auth" hidden>
-  <h2>Sign in to TheDugout</h2>
-  <p class="sub">Your team, locked players and assistant, saved to your account.</p>
-  <button class="btn-google" id="googleBtn" type="button">Continue with Google</button>
-  <div class="or"><span>or</span></div>
-  <div class="seg" role="tablist" aria-label="Sign in or create an account">
-    <button type="button" id="modeIn" role="tab" aria-selected="true">Sign in</button>
-    <button type="button" id="modeUp" role="tab" aria-selected="false">Create account</button>
-  </div>
-  <form id="authForm" novalidate>
-    <label for="authEmail">Email</label>
-    <input id="authEmail" type="email" autocomplete="email">
-    <label for="authPass">Password</label>
-    <div class="pw">
-      <input id="authPass" type="password" autocomplete="current-password">
-      <button type="button" id="pwToggle" aria-label="Show password">Show</button>
+<section class="landing" id="auth" hidden>
+  <div class="hero">
+    <svg class="pitch-art" viewBox="0 0 150 100" aria-hidden="true" fill="none" stroke="#00ff87" stroke-width="1.2"><rect x="2" y="2" width="146" height="96"/><line x1="75" y1="2" x2="75" y2="98"/><circle cx="75" cy="50" r="14"/><rect x="2" y="30" width="22" height="40"/><rect x="126" y="30" width="22" height="40"/></svg>
+    <div class="wm"><b>TheDugout</b><span>FPL Assistant</span></div>
+    <h1>Know who to start before the deadline.</h1>
+    <p class="lead">A data-driven assistant for your Fantasy Premier League squad, with a model behind every suggestion.</p>
+    <div class="feat">
+      <div><b>Predicted points</b><span>Every player, every gameweek, adjusted for fixtures and injuries.</span></div>
+      <div><b>Best XI and captain</b><span>Import your team ID and see the strongest lineup.</span></div>
+      <div><b>Transfer ideas</b><span>Lock the players you never sell and see the best swaps.</span></div>
+      <div><b>Ask in plain English</b><span>Compare players and check fixtures in a quick chat.</span></div>
     </div>
-    <button class="btn wide" id="authSubmit" type="submit">Sign in</button>
-  </form>
-  <button class="linkbtn" id="forgotBtn" type="button">Forgot password?</button>
-  <p class="hint" id="authMsg" role="status" style="margin-top:10px"></p>
+  </div>
+  <div class="signin-side">
+    <div class="auth landing-card">
+      <h2 id="authTitle">Welcome back</h2>
+      <p class="sub" id="authSub">Sign in to see your team and saved settings.</p>
+      <button class="btn-google" id="googleBtn" type="button">Continue with Google</button>
+      <div class="or"><span>or</span></div>
+      <div class="seg" role="tablist" aria-label="Sign in or create an account">
+        <button type="button" id="modeIn" role="tab" aria-selected="true">Sign in</button>
+        <button type="button" id="modeUp" role="tab" aria-selected="false">Create account</button>
+      </div>
+      <form id="authForm" novalidate>
+        <label for="authEmail">Email</label>
+        <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com">
+        <label for="authPass">Password</label>
+        <div class="pw">
+          <input id="authPass" type="password" autocomplete="current-password" placeholder="At least 8 characters">
+          <button type="button" id="pwToggle" aria-label="Show password">Show</button>
+        </div>
+        <button class="btn wide neon" id="authSubmit" type="submit">Sign in</button>
+      </form>
+      <div class="center"><button class="linkbtn" id="forgotBtn" type="button">Forgot password?</button></div>
+      <p class="hint center" id="authMsg" role="status" style="margin-top:10px"></p>
+    </div>
+  </div>
 </section>
 
 <section class="auth" id="recover" hidden>
@@ -214,7 +252,7 @@ textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px soli
         <textarea id="input" rows="1" maxlength="500" aria-label="Your question" placeholder="Who should I captain this week?"></textarea>
         <button class="btn" id="send" type="submit">Send</button>
       </form>
-      <div class="note">Predictions are model estimates, not guarantees. Fixture difficulty is a simple adjustment.</div>
+      <div class="note">Predictions are model estimates, not guarantees. Fixture difficulty is a simple adjustment. <span id="quota"></span></div>
     </div>
 
     <div class="tabpanel" id="tab-transfers" role="tabpanel" hidden>
@@ -238,7 +276,8 @@ function el(tag, cls, text) {
   if (text !== undefined) n.textContent = text;
   return n;
 }
-
+// Paste your own values from Supabase (Project Settings > API). The anon/publishable key is
+// designed to be public. NEVER put the service_role key here.
 const SUPABASE_URL = "https://iooqsgljzerpbtrrblrj.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SGv85FawJq6G4N5_qlZ_vg_aEr1gT4m";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -257,6 +296,7 @@ async function api(path, opts) {
   return d;
 }
 const money = tenths => "£" + (tenths / 10).toFixed(1) + "m";
+const showQuota = n => { $("quota").textContent = n + " chat message" + (n === 1 ? "" : "s") + " left today."; };
 const teamInput = $("teamId");
 const getTeamId = () => /^\d+$/.test(teamInput.value.trim()) ? parseInt(teamInput.value.trim(), 10) : null;
 
@@ -493,6 +533,7 @@ async function ask(text) {
     typing.remove();
     if (!res.ok) addMsg("error", typeof data.detail === "string" ? data.detail : "Check your message is under 500 characters and try again.");
     else { addMsg("ok", "", render(data.reply));
+      if (typeof data.remaining === "number") showQuota(data.remaining);
       history.push({ role: "user", content: text }, { role: "assistant", content: data.reply }); }
   } catch (err) { typing.remove(); addMsg("error", "Can't reach the server. Check that it's running and try again."); }
   finally { send.disabled = false; input.focus(); }
@@ -552,6 +593,7 @@ async function loadMe() {
     const me = await api("/me");
     if (me.team_id) teamInput.value = me.team_id;
     locked = new Set(me.locked || []);
+    if (typeof me.chat_remaining === "number") showQuota(me.chat_remaining);
     if (getTeamId()) $("loadForm").requestSubmit();
   } catch (e) { console.warn("Could not load preferences:", e.message); }
 }
@@ -561,6 +603,7 @@ function setSignedIn(session) {
   if (!on && currentUserId) { location.reload(); return; }
   accessToken = on ? session.access_token : null;
   $("auth").hidden = on; $("recover").hidden = true;
+  document.body.classList.toggle("signed-out", !on);
   $("app").hidden = !on; $("who").hidden = !on; $("loadForm").hidden = !on;
   if (on) {
     $("email").textContent = session.user.email || "";
@@ -582,6 +625,8 @@ function setMode(mode) {
   $("modeIn").setAttribute("aria-selected", mode === "in");
   $("modeUp").setAttribute("aria-selected", mode === "up");
   $("authSubmit").textContent = mode === "in" ? "Sign in" : "Create account";
+  $("authTitle").textContent = mode === "in" ? "Welcome back" : "Create your account";
+  $("authSub").textContent = mode === "in" ? "Sign in to see your team and saved settings." : "Save your team and locked players to your account.";
   $("authPass").autocomplete = mode === "in" ? "current-password" : "new-password";
   $("forgotBtn").hidden = mode !== "in";
   authMsg("", false);
