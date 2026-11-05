@@ -11,30 +11,25 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
 :root{--deep:#0c3324;--turf:#1f6b43;--chalk:#f4f6ea;--amber:#f0a92e;--bg:#e6ebdc;
-  --surface:#f8f9f2;--ink:#12241b;--muted:#5a6d60;--line:#ccd6c0;--red:#c8402f}
+  --neon:#00ff87;--surface:#f8f9f2;--ink:#12241b;--muted:#5a6d60;--line:#ccd6c0;--red:#c8402f}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;
   background:var(--bg);color:var(--ink);line-height:1.45}
 button,input,select,textarea{font:inherit}
-:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+:focus-visible{outline:3px solid var(--turf);outline-offset:2px}
 
-header{background:var(--deep);color:var(--chalk);padding:12px 20px;display:flex;flex-wrap:wrap;
-  gap:12px;align-items:center;justify-content:space-between;border-bottom:4px solid var(--amber)}
+header{background:var(--surface);color:var(--deep);padding:12px 20px;display:flex;flex-wrap:wrap;
+  gap:12px;align-items:center;justify-content:space-between;border-bottom:4px solid var(--neon)}
 .brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 h1{margin:0;font-size:1.5rem;font-weight:800;letter-spacing:-.03em}
 .tag{font-size:.9rem;color:#9fc4ad;font-weight:400}
 .loader{display:flex;gap:8px;align-items:center}
 .loader input{width:10em;padding:8px 10px;border-radius:6px;border:0;background:var(--chalk);color:var(--ink)}
-.btn{border:0;border-radius:6px;padding:8px 16px;font-weight:600;cursor:pointer;background:var(--amber);color:var(--deep)}
+.btn{border:0;border-radius:6px;padding:8px 16px;font-weight:600;cursor:pointer;background:var(--neon);color:var(--deep)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
-.app{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;max-width:1200px;margin:0 auto;padding:16px}
-@media(max-width:900px){.app{grid-template-columns:1fr}}
-.panel{background:var(--surface);border-radius:12px;overflow:hidden;border:1px solid var(--line)}
-.panel-head{background:var(--deep);color:var(--chalk);padding:10px 16px;display:flex;
-  justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.92rem}
-.panel-head b{color:var(--amber)}
+.panel{background:var(--surface); border-radius:12px; overflow:hidden;border:1px solid var(--line);}
 
 .pitch{position:relative;min-height:560px;padding:20px 8px 16px;display:flex;flex-direction:column;
   justify-content:space-around;background:repeating-linear-gradient(180deg,#2b8450 0 56px,#267a49 56px 112px)}
@@ -45,7 +40,7 @@ h1{margin:0;font-size:1.5rem;font-weight:800;letter-spacing:-.03em}
 .player{width:86px;text-align:center;flex:none}
 .shirt{position:relative;width:46px;margin:0 auto;display:block}
 .shirt svg{width:46px;height:42px;display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
-.badge{position:absolute;top:-4px;right:-8px;width:20px;height:20px;border-radius:50%;background:var(--amber);
+.badge{position:absolute;top:-4px;right:-8px;width:20px;height:20px;border-radius:50%;background:var(--neon);
   color:var(--deep);font-size:.7rem;font-weight:800;display:grid;place-items:center;border:1.5px solid var(--deep)}
 .pname{background:var(--deep);color:var(--chalk);font-size:.74rem;font-weight:600;padding:2px 4px;
   border-radius:4px 4px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -59,8 +54,7 @@ h1{margin:0;font-size:1.5rem;font-weight:800;letter-spacing:-.03em}
 
 .tabs{display:flex;border-bottom:1px solid var(--line);background:#eef2e6}
 .tab{flex:1;border:0;background:none;padding:12px 8px;font-weight:600;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent}
-.tab[aria-selected=true]{color:var(--deep);border-bottom-color:var(--amber)}
-.tabpanel{height:600px;display:flex;flex-direction:column}
+.tab[aria-selected=true]{color:var(--deep);border-bottom-color:var(--neon)}
 .tabpanel[hidden]{display:none}
 .scroll{flex:1;overflow:auto;padding:12px 14px}
 .hint{color:var(--muted);font-size:.88rem;margin:0 0 10px}
@@ -87,13 +81,9 @@ select{padding:6px 8px;border-radius:6px;border:1px solid var(--line);background
 form.composer{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
 textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px solid var(--line);max-height:7em;background:#fff}
 .note{font-size:.74rem;color:var(--muted);padding:0 14px 10px}
-.countdown{display:flex;flex-direction:column;align-items:center;line-height:1.2}
-.cd-label{font-size:.75rem;color:#9fc4ad}
-.cd-time{font-size:1.15rem;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums}
-.countdown.urgent .cd-time{color:#ff8a70}
 .player{cursor:pointer}
 .tip{position:fixed;z-index:50;width:250px;max-width:calc(100vw - 16px);background:var(--deep);color:var(--chalk);
-  border:1px solid var(--amber);border-radius:10px;padding:10px 12px;font-size:.82rem;
+  border:1px solid var(--neon);border-radius:10px;padding:10px 12px;font-size:.82rem;
   box-shadow:0 6px 20px rgba(0,0,0,.35);pointer-events:none}
 .tip[hidden]{display:none}
 .tip-name{font-weight:800;font-size:1rem}
@@ -102,15 +92,13 @@ textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px soli
 .tip-row span:first-child{color:#9fc4ad;white-space:nowrap}
 .tip-row span:last-child{text-align:right}
 .tip-row .warn{color:#ff9d8a;font-weight:600}
-.gwbar{background:#12402e;color:var(--chalk);padding:8px 20px;font-size:.86rem;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
-.gwbar[hidden]{display:none}
 .gwtag{border-radius:999px;padding:2px 10px;font-weight:600}
-.gwtag.dgw{background:var(--amber);color:var(--deep)}
+.gwtag.dgw{background:#f0a92e;color:var(--deep)}
 .gwtag.bgw{background:#d9523f;color:#fff}
 .lock{position:absolute;left:-10px;top:-4px;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--deep);
   background:var(--chalk);font-size:.65rem;line-height:1;padding:0;cursor:pointer;display:grid;place-items:center}
-.lock[aria-pressed=true]{background:var(--amber)}
-.x2{position:absolute;left:-12px;bottom:0;background:var(--amber);color:var(--deep);font-size:.62rem;font-weight:800;
+.lock[aria-pressed=true]{background:var(--neon)}
+.x2{position:absolute;left:-12px;bottom:0;background:var(--neon);color:var(--deep);font-size:.62rem;font-weight:800;
   border-radius:4px;padding:0 3px;border:1px solid var(--deep)}
 .loader[hidden],.who[hidden],.app[hidden],.auth[hidden]{display:none}
 .who{display:flex;gap:10px;align-items:center;font-size:.85rem}
@@ -135,7 +123,7 @@ textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px soli
 .seg button[aria-selected=true]{background:var(--deep);color:var(--chalk)}
 .linkbtn{border:0;background:none;color:var(--turf);text-decoration:underline;cursor:pointer;margin-top:12px;font-size:.88rem}
 .linkbtn[hidden]{display:none}
-body.signed-out header,body.signed-out .gwbar{display:none}
+body.signed-out header{display:none}
 .landing{display:grid;grid-template-columns:1.15fr 1fr;min-height:100vh}
 .landing[hidden]{display:none}
 .hero{position:relative;overflow:hidden;background:linear-gradient(160deg,#0c3324,#145239);color:var(--chalk);padding:64px;display:flex;flex-direction:column;justify-content:center;gap:26px}
@@ -157,20 +145,45 @@ body.signed-out header,body.signed-out .gwbar{display:none}
 .btn.neon{background:#00ff87;color:#0c3324;font-weight:800;font-size:1rem}
 .center{text-align:center}
 @media(max-width:900px){.landing{grid-template-columns:1fr;min-height:0}.hero{padding:40px 24px}.hero h1{font-size:2.4rem}.feat{grid-template-columns:1fr}}
+.brand .tag{color:var(--turf)}
+.loader input{border:1.5px solid #6f8577;background:#fff}
+.hright{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.who{color:#4a5d51}
+.who .btn{background:var(--deep);color:var(--chalk)}
+.app{display:grid;grid-template-columns:270px minmax(0,1fr) 360px;gap:16px;max-width:1400px;margin:0 auto;padding:16px 24px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.card:last-child{margin-bottom:0}
+.card.dl{background:var(--deep);border-color:var(--deep);color:var(--chalk)}
+.lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600}
+.dl .lbl{color:#b7d8c4}
+.cd-time{font-size:1.9rem;font-weight:800;color:var(--neon);font-variant-numeric:tabular-nums;line-height:1.2}
+.urgent .cd-time{color:#ff8a70}
+.gwnote{margin-top:8px;font-size:.82rem;color:#c3dccb;display:flex;flex-wrap:wrap;gap:6px}
+.gwnote[hidden]{display:none}
+.tr{display:flex;justify-content:space-between;gap:8px;padding:9px 0;border-top:1px solid var(--line);font-size:.88rem}
+.tr b{color:var(--turf);text-align:right}
+.centre{min-width:0}
+.pitch{min-height:690px;padding:22px 8px;border-radius:12px;box-shadow:0 4px 18px rgba(12,51,36,.18)}
+.bench{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.bench[hidden]{display:none}
+.panel.assistant{position:relative;min-height:640px;align-self:stretch}
+.ainner{position:absolute;inset:0;display:flex;flex-direction:column}
+.tabpanel{flex:1;min-height:0;display:flex;flex-direction:column}
+@media(max-width:1000px){.app{grid-template-columns:1fr}.panel.assistant{height:640px}}
 </style>
 </head>
 <body class="signed-out">
 <header>
   <div class="brand"><h1>TheDugout</h1><span class="tag">FPL Assistant</span></div>
-  <div class="countdown" id="countdown" hidden><span class="cd-label" id="cdLabel"></span><span class="cd-time" id="cdTime"></span></div>
-  <div class="who" id="who" hidden><span id="email"></span><button class="btn" id="signOut" type="button">Sign out</button></div>
-  <form class="loader" id="loadForm" hidden>
-    <label for="teamId" style="font-size:.9rem">Team ID</label>
-    <input id="teamId" inputmode="numeric" placeholder="e.g. 1829025">
-    <button class="btn" id="loadBtn" type="submit">Load team</button>
-  </form>
+  <div class="hright">
+    <form class="loader" id="loadForm" hidden>
+      <label for="teamId" style="font-size:.9rem">Team ID</label>
+      <input id="teamId" inputmode="numeric" placeholder="e.g. 1829025">
+      <button class="btn" id="loadBtn" type="submit">Load team</button>
+    </form>
+    <div class="who" id="who" hidden><span id="email"></span><button class="btn" id="signOut" type="button">Sign out</button></div>
+  </div>
 </header>
-<div class="gwbar" id="gwbar" hidden></div>
 
 <section class="landing" id="auth" hidden>
   <div class="hero">
@@ -222,8 +235,25 @@ body.signed-out header,body.signed-out .gwbar{display:none}
 </section>
 
 <div class="app" id="app" hidden>
-  <section class="panel" aria-label="Your lineup">
-    <div class="panel-head" id="pitchHead"><span>Your best XI</span><span id="pitchSummary"></span></div>
+  <aside class="rail" aria-label="Summary">
+    <div class="card dl">
+      <div id="countdown" hidden><div class="lbl" id="cdLabel"></div><div class="cd-time" id="cdTime"></div></div>
+      <div class="gwnote" id="gwbar" hidden></div>
+    </div>
+    <div class="card">
+      <div class="lbl">Your lineup <span id="sumGw"></span></div>
+      <div class="tr"><span>Expected points</span><b id="sumPts">-</b></div>
+      <div class="tr"><span>Captain</span><b id="sumCap">-</b></div>
+      <div class="tr"><span>Vice-captain</span><b id="sumVice">-</b></div>
+      <div class="tr"><span>Locked</span><b id="sumLocked">-</b></div>
+    </div>
+    <div class="card">
+      <div class="lbl">Best transfers</div>
+      <div id="topTransfers"><p class="hint">Load your team to see transfer ideas.</p></div>
+    </div>
+  </aside>
+
+  <div class="centre">
     <div class="pitch" id="pitch">
       <svg class="lines" viewBox="0 0 100 100" preserveAspectRatio="none" fill="none" stroke="rgba(255,255,255,.55)" stroke-width=".5" vector-effect="non-scaling-stroke" aria-hidden="true">
         <rect x="1" y="1" width="98" height="98"/><line x1="1" y1="50" x2="99" y2="50"/>
@@ -234,9 +264,9 @@ body.signed-out header,body.signed-out .gwbar{display:none}
       <div class="pitch-empty" id="pitchEmpty">Enter your team ID and tap Load team to see your best XI for the next gameweek.</div>
     </div>
     <div class="bench" id="bench" hidden></div>
-  </section>
+  </div>
 
-  <section class="panel" aria-label="Assistant">
+  <section class="panel assistant" aria-label="Assistant"><div class="ainner">
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" aria-selected="true" data-tab="chat">Ask TheDugout</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="transfers">Transfers</button>
@@ -265,7 +295,7 @@ body.signed-out header,body.signed-out .gwbar{display:none}
       </div>
       <div class="scroll" id="players"></div>
     </div>
-  </section>
+  </div></section>
 </div>
 
 <script>
@@ -314,10 +344,19 @@ let transferTimer = null;
 function toggleLock(p, btn) {
   if (locked.has(p.player_id)) locked.delete(p.player_id); else locked.add(p.player_id);
   savePrefs();
+  setLockedSummary();
   btn.setAttribute("aria-pressed", locked.has(p.player_id));
   btn.textContent = locked.has(p.player_id) ? "\u{1F512}" : "\u{1F513}";
   clearTimeout(transferTimer);
   transferTimer = setTimeout(() => { const id = getTeamId(); if (id) loadTransfers(id); }, 400);
+}
+
+let lastLineup = null;
+function setLockedSummary() {
+  if (!lastLineup) return;
+  const names = [...lastLineup.starting_xi, ...lastLineup.bench]
+    .filter(p => locked.has(p.player_id)).map(p => p.web_name);
+  $("sumLocked").textContent = names.length ? names.join(", ") : "None";
 }
 
 /* ---------- tabs ---------- */
@@ -426,13 +465,24 @@ function renderLineup(d) {
     bench.appendChild(w);
   });
   bench.hidden = false;
-  $("pitchSummary").replaceChildren(
-    document.createTextNode("GW" + d.gameweek + " expected: "), el("b", "", d.expected_points + " pts"),
-    document.createTextNode(" | Captain: " + d.captain));
+  lastLineup = d;
+  $("sumGw").textContent = "(GW" + d.gameweek + ")";
+  $("sumPts").textContent = d.expected_points;
+  $("sumCap").textContent = d.captain;
+  $("sumVice").textContent = d.vice_captain;
+  setLockedSummary();
 }
 
 /* ---------- transfers ---------- */
 function renderTransfers(d) {
+  const top = $("topTransfers");
+  top.replaceChildren();
+  if (!d.suggestions.length) top.appendChild(el("p", "hint", "No transfer ideas right now."));
+  d.suggestions.slice(0, 3).forEach(s => {
+    const r = el("div", "tr");
+    r.append(el("span", "", s.sell + " to " + s.buy), el("b", "", "+" + s.gain.toFixed(2)));
+    top.appendChild(r);
+  });
   const box = $("transfers");
   box.replaceChildren(el("p", "hint",
     "Bank " + "£" + Number(d.bank_millions).toFixed(1) + "m. Current XI: " + d.current_xi_points +
@@ -458,7 +508,10 @@ async function loadTransfers(id) {
   try {
     const q = locked.size ? "?locked=" + [...locked].join(",") : "";
     renderTransfers(await api("/transfers/" + id + q));
-  } catch (err) { $("transfers").replaceChildren(el("p", "err", err.message)); }
+  } catch (err) {
+    $("transfers").replaceChildren(el("p", "err", err.message));
+    $("topTransfers").replaceChildren(el("p", "err", err.message));
+  }
 }
 $("loadForm").addEventListener("submit", async e => {
   e.preventDefault();
@@ -501,7 +554,7 @@ $("posFilter").addEventListener("change", loadPlayers);
 
 /* ---------- chat ---------- */
 const thread = $("thread"), log = $("log"), input = $("input"), send = $("send");
-const history = [];
+const chatHistory = [];
 ["Who should I captain?", "Best transfers for my team?", "Best defenders under £5.5m?",
  "Compare Saka and Palmer", "Does Arsenal have an easy run?"].forEach(q => {
   const b = el("button", "chip", q); b.type = "button"; b.onclick = () => ask(q); $("chips").appendChild(b);
@@ -524,7 +577,7 @@ async function ask(text) {
   addMsg("user", text);
   input.value = ""; input.style.height = "auto"; send.disabled = true;
   const typing = addMsg("typing", "Thinking...");
-  const body = { message: text, history: history.slice(-10) };
+  const body = { message: text, history: chatHistory.slice(-10) };
   const id = getTeamId(); if (id) body.team_id = id;
   if (locked.size) body.locked = [...locked].slice(0, 15);
   try {
@@ -534,7 +587,7 @@ async function ask(text) {
     if (!res.ok) addMsg("error", typeof data.detail === "string" ? data.detail : "Check your message is under 500 characters and try again.");
     else { addMsg("ok", "", render(data.reply));
       if (typeof data.remaining === "number") showQuota(data.remaining);
-      history.push({ role: "user", content: text }, { role: "assistant", content: data.reply }); }
+      chatHistory.push({ role: "user", content: text }, { role: "assistant", content: data.reply }); }
   } catch (err) { typing.remove(); addMsg("error", "Can't reach the server. Check that it's running and try again."); }
   finally { send.disabled = false; input.focus(); }
 }
