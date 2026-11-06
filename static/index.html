@@ -29,12 +29,7 @@ h1{margin:0;font-size:1.5rem;font-weight:800;letter-spacing:-.03em}
 .btn{border:0;border-radius:6px;padding:8px 16px;font-weight:600;cursor:pointer;background:var(--neon);color:var(--deep)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
-.panel{
-  background:var(--surface);
-  border-radius:12px;
-  overflow:hidden;
-  border:1px solid var(--line);
-}
+.panel{background:var(--surface);border-radius:12px;overflow:hidden;border:1px solid var(--line);}
 
 .pitch{position:relative;min-height:560px;padding:20px 8px 16px;display:flex;flex-direction:column;
   justify-content:space-around;background:repeating-linear-gradient(180deg,#2b8450 0 56px,#267a49 56px 112px)}
@@ -129,7 +124,7 @@ textarea{flex:1;resize:none;padding:8px 10px;border-radius:8px;border:1.5px soli
 .linkbtn{border:0;background:none;color:var(--turf);text-decoration:underline;cursor:pointer;margin-top:12px;font-size:.88rem}
 .linkbtn[hidden]{display:none}
 body.signed-out header{display:none}
-.landing{display:grid;grid-template-columns:1.15fr 1fr;min-height:100vh}
+.landing{display:grid;grid-template-columns:1.15fr 1fr;min-height:calc(100vh - 80px)}
 .landing[hidden]{display:none}
 .hero{position:relative;overflow:hidden;background:linear-gradient(160deg,#0c3324,#145239);color:var(--chalk);padding:64px;display:flex;flex-direction:column;justify-content:center;gap:26px}
 .hero>*{position:relative}
@@ -182,6 +177,12 @@ table.ticker{width:auto;font-size:.78rem}
 .fxcell{width:46px}
 .fxcell.blank{color:var(--muted)}
 .fxc{border-radius:4px;padding:5px 0;margin:1px 0;font-weight:700;font-size:.75rem}
+.sitefoot{display:none;background:#0c3324;color:#b7d8c4;padding:12px 48px;font-size:.78rem;line-height:1.5;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px 32px}
+#auth:not([hidden]) + .sitefoot{display:flex}
+.sitefoot p{margin:0;flex:1 1 420px}
+.foot-built{display:flex;flex-wrap:wrap;gap:6px}
+.foot-built span{border:1px solid #2f6b50;border-radius:999px;padding:1px 9px;color:#f4f6ea;font-size:.74rem}
+@media(max-width:700px){.sitefoot{padding:14px 24px}}
 </style>
 </head>
 <body class="signed-out">
@@ -235,6 +236,11 @@ table.ticker{width:auto;font-size:.78rem}
     </div>
   </div>
 </section>
+
+<footer class="sitefoot">
+  <p>&copy; <span id="footYear"></span> JASDEEP SIDHU. TheDugout is an independent project and is not affiliated with, endorsed by or sponsored by the Premier League or Fantasy Premier League. Predictions are model estimates, not guarantees.</p>
+  <div class="foot-built" aria-label="Built with"><span>Python</span><span>FastAPI</span><span>PostgreSQL</span><span>XGBoost</span><span>Gemini API</span><span>Supabase Auth</span></div>
+</footer>
 
 <section class="auth" id="recover" hidden>
   <h2>Choose a new password</h2>
@@ -569,6 +575,8 @@ async function loadPlayers() {
   } catch (e) { box.replaceChildren(el("p", "err", e.message)); }
 }
 $("posFilter").addEventListener("change", loadPlayers);
+
+$("footYear").textContent = new Date().getFullYear();
 
 /* ---------- fixture ticker ---------- */
 async function loadTicker() {
