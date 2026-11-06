@@ -167,6 +167,9 @@ def predictions(limit: int = Query(20, ge=1, le=100), pos: Optional[str] = None,
 def fixtures(team: str, n: int = Query(5, ge=1, le=8)):
     return _handle(core.get_team_fixtures, team, n)
 
+@app.get("/fixture-grid")
+def fixture_grid(n: int = Query(6, ge=1, le=8)):
+    return _handle(core.fixture_grid, n)
 
 # ---------- signed-in endpoints ----------
 class Prefs(BaseModel):

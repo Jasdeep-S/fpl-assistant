@@ -29,7 +29,12 @@ h1{margin:0;font-size:1.5rem;font-weight:800;letter-spacing:-.03em}
 .btn{border:0;border-radius:6px;padding:8px 16px;font-weight:600;cursor:pointer;background:var(--neon);color:var(--deep)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
-.panel{background:var(--surface); border-radius:12px; overflow:hidden;border:1px solid var(--line);}
+.panel{
+  background:var(--surface);
+  border-radius:12px;
+  overflow:hidden;
+  border:1px solid var(--line);
+}
 
 .pitch{position:relative;min-height:560px;padding:20px 8px 16px;display:flex;flex-direction:column;
   justify-content:space-around;background:repeating-linear-gradient(180deg,#2b8450 0 56px,#267a49 56px 112px)}
@@ -170,6 +175,13 @@ body.signed-out header{display:none}
 .ainner{position:absolute;inset:0;display:flex;flex-direction:column}
 .tabpanel{flex:1;min-height:0;display:flex;flex-direction:column}
 @media(max-width:1000px){.app{grid-template-columns:1fr}.panel.assistant{height:640px}}
+.tab{padding:12px 4px;font-size:.9rem}
+table.ticker{width:auto;font-size:.78rem}
+.ticker th,.ticker td{padding:2px;border-bottom:0;text-align:center}
+.ticker th.club{text-align:left;padding-right:8px;font-weight:800;color:var(--deep);background:transparent}
+.fxcell{width:46px}
+.fxcell.blank{color:var(--muted)}
+.fxc{border-radius:4px;padding:5px 0;margin:1px 0;font-weight:700;font-size:.75rem}
 </style>
 </head>
 <body class="signed-out">
@@ -268,9 +280,10 @@ body.signed-out header{display:none}
 
   <section class="panel assistant" aria-label="Assistant"><div class="ainner">
     <div class="tabs" role="tablist">
-      <button class="tab" role="tab" aria-selected="true" data-tab="chat">Ask TheDugout</button>
+      <button class="tab" role="tab" aria-selected="true" data-tab="chat">Chat</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="transfers">Transfers</button>
-      <button class="tab" role="tab" aria-selected="false" data-tab="players">Top players</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="players">Players</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="fixtures">Fixtures</button>
     </div>
 
     <div class="tabpanel" id="tab-chat" role="tabpanel">
@@ -287,6 +300,10 @@ body.signed-out header{display:none}
 
     <div class="tabpanel" id="tab-transfers" role="tabpanel" hidden>
       <div class="scroll" id="transfers"><p class="hint">Load your team to see the best single transfers.</p></div>
+    </div>
+
+    <div class="tabpanel" id="tab-fixtures" role="tabpanel" hidden>
+      <div class="scroll" id="ticker"></div>
     </div>
 
     <div class="tabpanel" id="tab-players" role="tabpanel" hidden>
@@ -364,6 +381,7 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
   document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === t));
   document.querySelectorAll(".tabpanel").forEach(p => p.hidden = p.id !== "tab-" + t.dataset.tab);
   if (t.dataset.tab === "players" && !$("players").hasChildNodes()) loadPlayers();
+  if (t.dataset.tab === "fixtures" && !$("ticker").hasChildNodes()) loadTicker();
 }));
 
 /* ---------- pitch ---------- */
@@ -551,6 +569,40 @@ async function loadPlayers() {
   } catch (e) { box.replaceChildren(el("p", "err", e.message)); }
 }
 $("posFilter").addEventListener("change", loadPlayers);
+
+/* ---------- fixture ticker ---------- */
+async function loadTicker() {
+  const box = $("ticker");
+  box.replaceChildren(el("p", "hint", "Loading..."));
+  try {
+    const d = await api("/fixture-grid");
+    const t = el("table", "ticker"), head = el("tr");
+    head.appendChild(el("th", "", "Club"));
+    d.gameweeks.forEach(g => head.appendChild(el("th", "", "GW" + g)));
+    t.appendChild(head);
+    d.teams.forEach(team => {
+      const r = el("tr");
+      const name = el("th", "club", team.team);
+      name.scope = "row"; name.title = team.name;
+      r.appendChild(name);
+      team.cells.forEach(cell => {
+        const td = el("td", "fxcell");
+        if (!cell.length) { td.classList.add("blank"); td.textContent = "-"; td.title = "No fixture"; }
+        cell.forEach(f => {
+          const diff = Math.min(5, Math.max(1, f.difficulty));
+          const c = el("div", "fxc fdr" + diff, f.home ? f.opp : f.opp.toLowerCase());
+          const label = team.name + " vs " + f.opp + (f.home ? " (home)" : " (away)") + ", difficulty " + diff + " of 5";
+          c.title = label; c.setAttribute("aria-label", label);
+          td.appendChild(c);
+        });
+        r.appendChild(td);
+      });
+      t.appendChild(r);
+    });
+    box.replaceChildren(el("p", "hint",
+      "Easiest runs first. CAPITALS are home games, lowercase are away. Green is easy, red is hard (FPL's own ratings). Two boxes in a cell means a double gameweek, and a dash means no game."), t);
+  } catch (e) { box.replaceChildren(el("p", "err", e.message)); }
+}
 
 /* ---------- chat ---------- */
 const thread = $("thread"), log = $("log"), input = $("input"), send = $("send");

@@ -259,3 +259,46 @@ def gameweek_flags(num_gameweeks: int = 6):
             flags.append({"gameweek": gw, "double": doubles, "blank": blanks})
     return {"from_gameweek": next_gw, "to_gameweek": last_gw, "flags": flags,
             "note": "Based on current FPL fixture data; future gameweeks can change."}
+
+def fixture_grid(num_gameweeks: int = 6):
+    """All 20 clubs against the next few gameweeks, easiest runs first."""
+    gws = pd.read_sql("SELECT id, is_next FROM raw_gameweeks", engine)
+    nxt = gws.loc[gws["is_next"], "id"]
+    if nxt.empty:
+        raise ValueError("No upcoming gameweek found (season may be over)")
+    next_gw = int(nxt.iloc[0])
+    last_gw = min(next_gw + num_gameweeks - 1, 38)
+    gameweeks = list(range(next_gw, last_gw + 1))
+
+    teams = pd.read_sql("SELECT id, name, short_name FROM raw_teams", engine)
+    short = dict(zip(teams["id"], teams["short_name"]))
+    fx = pd.read_sql(
+        "SELECT event, team_h, team_a, team_h_difficulty, team_a_difficulty "
+        "FROM raw_fixtures WHERE event IS NOT NULL", engine)
+    fx = fx[(fx["event"] >= next_gw) & (fx["event"] <= last_gw)]
+
+    def diff(value):
+        return int(value) if pd.notna(value) else 3
+
+    rows = []
+    for _, t in teams.iterrows():
+        cells, diffs = [], []
+        for gw in gameweeks:
+            g = fx[fx["event"] == gw]
+            cell = []
+            for _, r in g[g["team_h"] == t["id"]].iterrows():
+                cell.append({"opp": short[r["team_a"]], "home": True,
+                             "difficulty": diff(r["team_h_difficulty"])})
+            for _, r in g[g["team_a"] == t["id"]].iterrows():
+                cell.append({"opp": short[r["team_h"]], "home": False,
+                             "difficulty": diff(r["team_a_difficulty"])})
+            cells.append(cell)
+            diffs += [c["difficulty"] for c in cell]
+        rows.append({"team": t["short_name"], "name": t["name"],
+                     "avg_difficulty": round(sum(diffs) / len(diffs), 2) if diffs else None,
+                     "cells": cells})
+
+    rows.sort(key=lambda r: (r["avg_difficulty"] is None, r["avg_difficulty"] or 0))
+    return {"from_gameweek": next_gw, "to_gameweek": last_gw,
+            "gameweeks": gameweeks, "teams": rows,
+            "note": "Difficulty: 1 = easiest, 5 = hardest (FPL's own rating)"}
