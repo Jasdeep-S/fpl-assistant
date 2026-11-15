@@ -6,9 +6,15 @@ from sqlalchemy import create_engine
 
 load_dotenv()
 engine = create_engine(os.environ["DATABASE_URL"])
-model = joblib.load("model.joblib")
-FEATURES = joblib.load("features.joblib")
 
+import json
+from xgboost import XGBRegressor
+
+model = XGBRegressor()
+model.load_model("model.json")
+with open("features.json") as f:
+    FEATURES = json.load(f)
+    
 # Hand-picked heuristic, not learned from data: +/-5% per FDR step away from 3.
 FDR_WEIGHT = 0.05
 

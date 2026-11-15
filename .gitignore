@@ -2,5 +2,3 @@
 __pycache__/
 .env
 *.pyc
-model.joblib
-features.joblib

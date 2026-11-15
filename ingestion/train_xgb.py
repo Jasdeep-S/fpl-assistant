@@ -46,7 +46,8 @@ print(r.groupby("pos")[["err_base", "err_model"]].mean().round(3))
 imp = pd.Series(model.feature_importances_, index=FEATURES).sort_values(ascending=False)
 print("\nTop features:\n", imp.head(8).round(3))
 
-# Save the model for the prediction script
-joblib.dump(model, "model.joblib")
-joblib.dump(FEATURES, "features.joblib")
-print("\nSaved model.joblib and features.joblib")
+import json
+model.save_model("model.json")
+with open("features.json", "w") as f:
+    json.dump(FEATURES, f)
+print("\nSaved model.json and features.json")

@@ -42,6 +42,9 @@ def create_tables():
                 count INT NOT NULL DEFAULT 0,
                 PRIMARY KEY (user_id, day))"""))
 
+        conn.execute(text("ALTER TABLE user_prefs ENABLE ROW LEVEL SECURITY"))
+        conn.execute(text("ALTER TABLE chat_usage ENABLE ROW LEVEL SECURITY"))
+
 
 # ---------- authentication ----------
 _token_cache: dict = {}
