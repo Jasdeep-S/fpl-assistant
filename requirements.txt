@@ -1,10 +1,10 @@
-requests
+fastapi
+uvicorn
 pandas
 sqlalchemy>=2.0,<2.1
 psycopg2-binary
-xgboost
-scikit-learn
+python-dotenv
+requests
+httpx
 pulp
-fastapi
-uvicorn
 google-genai
